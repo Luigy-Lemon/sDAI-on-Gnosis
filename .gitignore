@@ -9,7 +9,7 @@ out/
 
 # Ignore foundry folders
 lib/
-boradcast/
+broadcast/
 cache/
 out/
 
