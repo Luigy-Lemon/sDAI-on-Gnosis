@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.18;
 
-import "openzeppelin/token/ERC20/IERC20.sol";
+import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
 interface IWXDAI is IERC20{
   function deposit() external payable;
@@ -20,4 +20,6 @@ interface IWXDAI is IERC20{
     address dst,
     uint256 wad
   ) external returns (bool);
+
+  function name() external view returns (string memory);
 }

@@ -17,27 +17,60 @@ contract GnosisSavingsDAI is ERC4626{
         interestReceiver = IBridgeInterestReceiver(interestReceiver_);
     }
 
-    function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override returns (uint256) {
+        require(assets <= maxDeposit(receiver), "ERC4626: deposit more than max");
         interestReceiver.claim();
-        return this.deposit(assets, receiver);
-    }
-
-    function depositXDAI(uint256 assets, address receiver) public virtual payable returns (uint256) {
-        interestReceiver.claim();
-        wxdai.deposit{value:msg.value}();
-        return this.deposit(assets, receiver);
+        uint256 shares = previewDeposit(assets);
+        _deposit(_msgSender(), receiver, assets, shares);
+        return shares;
     }
 
     function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
+        require(shares <= maxMint(receiver), "ERC4626: mint more than max");
         interestReceiver.claim();
-        return this.mint(shares, receiver);
+
+        uint256 assets = previewMint(shares);
+        _deposit(_msgSender(), receiver, assets, shares);
+
+        return assets;
+    }
+
+    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
+        require(assets <= maxWithdraw(owner), "ERC4626: withdraw more than max");
+        interestReceiver.claim();
+
+        uint256 shares = previewWithdraw(assets);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+
+        return shares;
+    }
+
+    function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
+        require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
+        interestReceiver.claim();
+
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+
+        return assets;
+    }
+
+    function depositXDAI(address receiver) public virtual payable returns (uint256) {
+        uint256 assets = msg.value;
+        interestReceiver.claim();
+        uint256 shares = previewDeposit(assets);
+        wxdai.deposit{value:assets}();
+        _deposit(address(this), receiver, assets, shares);
+        return shares;
     }
 
     function withdrawXDAI(uint256 assets, address receiver, address owner) public virtual payable returns (uint256) {
-        uint256 shares = this.withdraw(assets, address(this), owner);
+        interestReceiver.claim();
+        uint256 shares = withdraw(assets, address(this), owner);
         wxdai.withdraw(assets);
-        (bool sent, ) = receiver.call{value: msg.value}("");
+        (bool sent, ) = receiver.call{value: assets}("");
         require(sent, "Failed to send Ether");
         return shares;
     }
+
 }
