@@ -5,6 +5,7 @@ import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import "./interfaces/IBridgeInterestReceiver.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
 
+
 contract GnosisSavingsDAI is ERC4626{
 
     IBridgeInterestReceiver immutable public interestReceiver;
@@ -71,6 +72,11 @@ contract GnosisSavingsDAI is ERC4626{
         (bool sent, ) = receiver.call{value: assets}("");
         require(sent, "Failed to send Ether");
         return shares;
+    }
+
+    receive() external payable {
+        if (msg.sender != address(wxdai))
+            revert();
     }
 
 }
