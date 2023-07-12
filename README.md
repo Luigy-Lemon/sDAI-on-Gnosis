@@ -1,6 +1,6 @@
-# Savings xDAI
+# Savings DAI on Gnosis Chain
 
-A tokenized wrapper of the Interest collected from Token Bridge deposits in sDAI. Supports ERC4626. Share to asset conversions are real-time even if the pot hasn't been dripped in a while. Please note this is sample code only and there is no official deploys. Feel free to deploy it yourself.
+A tokenized wrapper of the Interest collected from Token Bridge deposits in sDAI. Follows the ERC4626 Standard. Share to asset conversions are real-time even if the pot hasn't been dripped in a while. Please note this is sample code only and there is no official deploys. Feel free to deploy it yourself.
 
-# xDAI Streaming
-xDAI is moved into the sxDAI vault contract using a continuous slow drip from BridgeInterestReceiver to avoid abuse of JIT or similar arbitrage methods.
+# xDAI Interest Receiver
+xDAI is moved into the sDAI vault contract using a continuous dripRate from BridgeInterestReceiver to avoid arbitrage abuse.
