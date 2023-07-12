@@ -4,9 +4,12 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import 'forge-std/console.sol';
 import "./Setup.t.sol";
+import "./Mocks/MockMultisig.sol";
 
 
 contract GnosisSavingsDAITest is SetupTest{
+
+    bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function invariantMetadata() public {
         assertEq(address(sDAI.interestReceiver()), address(interestReceiver));
@@ -18,7 +21,7 @@ contract GnosisSavingsDAITest is SetupTest{
     
 
     /*//////////////////////////////////////////////////////////////
-                        MODIFIED LOGIC
+                        CORE LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function testDeposit() public{
@@ -182,7 +185,104 @@ contract GnosisSavingsDAITest is SetupTest{
         vm.stopPrank();
 
     }
-        
+
+    /*//////////////////////////////////////////////////////////////
+                        PERMIT LOGIC 
+    //////////////////////////////////////////////////////////////*/
 
 
+    function testPermit() public {
+        uint256 privateKey = 0xBEEF;
+        address owner = vm.addr(privateKey);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        sDAI.permit(owner, address(0xCAFE), 1e18, block.timestamp, v, r, s);
+
+        assertEq(sDAI.allowance(owner, address(0xCAFE)), 1e18);
+        assertEq(sDAI.nonces(owner), 1);
+    }
+
+     function testPermitContract() public {
+        uint256 privateKey1 = 0xBEEF;
+        address signer1 = vm.addr(privateKey1);
+        uint256 privateKey2 = 0xBEEE;
+        address signer2 = vm.addr(privateKey2);
+
+        address mockMultisig = address(new MockMultisig(signer1, signer2));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            uint256(privateKey1),
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(
+            uint256(privateKey2),
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
+
+        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
+
+        assertEq(sDAI.allowance(mockMultisig, address(0xCAFE)), 1e18);
+        assertEq(sDAI.nonces(mockMultisig), 1);
+    }
+
+    function testPermitContractInvalidSignature() public {
+        uint256 privateKey1 = 0xBEEF;
+        address signer1 = vm.addr(privateKey1);
+        uint256 privateKey2 = 0xBEEE;
+        address signer2 = vm.addr(privateKey2);
+
+        address mockMultisig = address(new MockMultisig(signer1, signer2));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            uint256(privateKey1),
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(
+            uint256(0xCEEE),
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                )
+            )
+        );
+
+        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
+
+        vm.expectRevert("SavingsDai/invalid-permit");
+        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
+    }
 }

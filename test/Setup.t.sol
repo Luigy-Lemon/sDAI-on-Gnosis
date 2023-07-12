@@ -33,7 +33,7 @@ contract SetupTest is Test {
         interestReceiver = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(interestReceiver));
 
-        sDAI = new GnosisSavingsDAI(address(interestReceiver));
+        sDAI = new GnosisSavingsDAI(address(interestReceiver), "Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
         vm.stopPrank();
 

@@ -35,7 +35,7 @@ contract GnosisSavingsDAIDeployer is Script {
         BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(interestReceiver));
 
-        GnosisSavingsDAI sDAI = new GnosisSavingsDAI(address(interestReceiver));
+        GnosisSavingsDAI sDAI = new GnosisSavingsDAI(address(interestReceiver), "Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
 
         interestReceiver.initialize(address(sDAI));
