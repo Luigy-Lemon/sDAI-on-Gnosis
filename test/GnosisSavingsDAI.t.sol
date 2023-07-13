@@ -12,7 +12,7 @@ contract GnosisSavingsDAITest is SetupTest{
     bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function invariantMetadata() public {
-        assertEq(address(sDAI.interestReceiver()), address(interestReceiver));
+        assertEq(address(sDAI.interestReceiver()), address(rcv));
         assertEq(address(sDAI.wxdai()), address(wxdai));
         assertEq(alice, address(10));
         assertEq(bob, address(11));

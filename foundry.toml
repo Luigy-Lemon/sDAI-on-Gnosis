@@ -25,4 +25,7 @@ fantom={key="${ETHERSCAN_API_KEY_FANTOM}",chainId=250}
 gnosis={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=100}
 chiado={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=10200}
 
+[fuzz]
+runs=1000
+
 # See more config options https://github.com/gakonst/foundry/tree/master/config

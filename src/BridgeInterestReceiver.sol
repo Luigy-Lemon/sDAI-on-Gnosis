@@ -11,8 +11,9 @@ contract BridgeInterestReceiver is Initializable {
     address public vault;
 
     uint256 public dripRate;
-    uint256 internal _nextClaimEpoch;
-    uint256 internal _lastClaimTimestamp;
+    uint256 public _nextClaimEpoch;
+    uint256 public _lastClaimTimestamp;
+    uint256 public epochLength = 1 days;
 
     event Claimed(uint256 indexed amount);
 
@@ -22,7 +23,7 @@ contract BridgeInterestReceiver is Initializable {
         vault = _vault;
     }
 
-    function claim() public {
+    function claim() external returns (uint256 claimed){
         uint256 xDAIbalance = address(this).balance;
 
         if (xDAIbalance > 0) {
@@ -31,25 +32,55 @@ contract BridgeInterestReceiver is Initializable {
 
         uint256 balance = wxdai.balanceOf(address(this));
 
-        // balance should be higher than 86400 to avoid
-        if (balance > 1 days) {
-            uint256 claimable = _calculateClaimable(balance);
+        // balance should be higher than 86400 to avoid underflow
+        if (balance > 0) {
+            (claimed) = _calcClaimable(balance);
             _lastClaimTimestamp = block.timestamp;
 
-            wxdai.transfer(vault, claimable);
-
-            emit Claimed(claimable);
+            wxdai.transfer(vault, claimed);            
+            emit Claimed(claimed);
         }
+
+        return claimed;
     }
 
-    function _calculateClaimable(uint256 balance) internal returns (uint256 claimable) {
-        if (block.timestamp >= _nextClaimEpoch) {
-            _nextClaimEpoch = block.timestamp + 1 days;
-            uint256 unclaimedTime = (block.timestamp - _lastClaimTimestamp);
-            dripRate = balance / (_nextClaimEpoch + unclaimedTime);
+    function _calcClaimable(uint256 balance) internal returns (uint256 claimable) {   
+        uint256 unclaimedTime = block.timestamp - _lastClaimTimestamp;
+        if (block.timestamp >= _nextClaimEpoch){
+            if (balance < epochLength){
+                dripRate = 0;
+            }
+            else{
+                dripRate = balance / (epochLength + unclaimedTime);
+                _nextClaimEpoch = block.timestamp + epochLength;
+            }
         }
-
-        claimable = (block.timestamp - _lastClaimTimestamp) * dripRate;
+        if (unclaimedTime >= epochLength) {
+                claimable = balance;
+        }
+        else {
+            claimable = unclaimedTime * dripRate;
+        }
         return claimable;
-    }
+    }    
+
+    function previewClaimable(uint256 balance) external view returns (uint256 claimable) {   
+        uint256 _dripRate = dripRate;
+        uint256 unclaimedTime = block.timestamp - _lastClaimTimestamp;
+        if (block.timestamp >= _nextClaimEpoch){
+            if (balance < epochLength){
+                _dripRate = 0;
+            }
+            else{
+                _dripRate = balance / (epochLength + unclaimedTime);
+            }
+        }
+        if (unclaimedTime >= epochLength) {
+                claimable = balance;
+        }
+        else {
+            claimable = unclaimedTime * _dripRate;
+        }
+        return claimable;
+    }   
 }

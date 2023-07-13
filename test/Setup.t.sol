@@ -13,13 +13,14 @@ contract SetupTest is Test {
     address public initializer = address(9);
     address public alice = address(10);
     address public bob = address(11);
-    BridgeInterestReceiver public interestReceiver;
+    BridgeInterestReceiver public rcv;
     GnosisSavingsDAI public sDAI;
     IWXDAI public wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    uint256 public globalTime;
 
     function setUp() public payable {
 
-        vm.createSelectFork("gnosis");
+        vm.createSelectFork("gnosis",28920197);
 
         vm.deal(initializer, 100 ether);
         vm.deal(alice, 10000 ether);
@@ -30,10 +31,10 @@ contract SetupTest is Test {
                                 DEPLOYMENTS
         //////////////////////////////////////////////////////////////*/
 
-        interestReceiver = new BridgeInterestReceiver();
-        console.log('Deployed InterestReceiver: %s', address(interestReceiver));
+        rcv = new BridgeInterestReceiver();
+        console.log('Deployed InterestReceiver: %s', address(rcv));
 
-        sDAI = new GnosisSavingsDAI(address(interestReceiver), "Savings DAI on Gnosis", "sDAI");
+        sDAI = new GnosisSavingsDAI(address(rcv), "Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
         vm.stopPrank();
 
@@ -45,8 +46,8 @@ contract SetupTest is Test {
         deal(address(wxdai), bob, 10000e18);
         assertEq(wxdai.balanceOf(bob), 10000e18);
 
-        deal(address(wxdai), address(interestReceiver), 100e18);
-        assertEq(wxdai.balanceOf(address(interestReceiver)), 100e18);
+        deal(address(wxdai), address(rcv), 100e18);
+        assertEq(wxdai.balanceOf(address(rcv)), 100e18);
     }
 
 
@@ -58,12 +59,13 @@ contract SetupTest is Test {
         address vault = address(sDAI);
 
         vm.startPrank(initializer);
-        try interestReceiver.initialize(vault){
+        try rcv.initialize(vault){
             console.log("initialized");
         }
         catch {
             console.log("already initialized");
         }
+        globalTime = block.timestamp;
         sDAI.depositXDAI{value:1e18}(initializer);
         vm.stopPrank();
 
@@ -90,17 +92,40 @@ contract SetupTest is Test {
     }
 
     function testDonateWXDAI() public{
-        vm.roll(100);
         uint256 initialPreview = sDAI.previewRedeem(10000);
         // Bob does a donation
         vm.startPrank(bob);
         wxdai.transfer(address(sDAI), 10e18);
-        wxdai.transfer(address(sDAI.interestReceiver()), 10e18);
+        wxdai.transfer(address(sDAI.interestReceiver()), 100e18);
         
         vm.stopPrank();
         assertEq(wxdai.balanceOf(address(sDAI)), sDAI.totalAssets());
         assertGe(sDAI.previewRedeem(10000), initialPreview);
     }
 
+    function testTopInterestReceiver() public{
+        uint256 initialPreview = sDAI.previewRedeem(10000);
+        // Bob does a donation
+        vm.startPrank(bob);
+        wxdai.transfer(address(sDAI.interestReceiver()), 100e18);
+        
+        vm.stopPrank();
+        assertEq(wxdai.balanceOf(address(sDAI)), sDAI.totalAssets());
+        assertEq(sDAI.previewRedeem(10000), initialPreview);
+    }
 
+
+    /*//////////////////////////////////////////////////////////////
+                        UTILS
+    //////////////////////////////////////////////////////////////*/
+
+    function teleport(uint256 _timestamp) public{
+        globalTime = _timestamp;
+        vm.warp(globalTime);
+    }
+
+    function skipTime(uint256 secs) public{
+        globalTime += secs;
+        vm.warp(globalTime);
+    }
 }

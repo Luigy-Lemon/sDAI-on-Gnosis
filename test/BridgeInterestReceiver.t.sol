@@ -6,8 +6,9 @@ import 'forge-std/console.sol';
 import "./Setup.t.sol";
 
 contract BridgeInterestReceiverTest is SetupTest {
+
     function invariantMetadata() public {
-        assertEq(address(sDAI.interestReceiver()), address(interestReceiver));
+        assertEq(address(sDAI.interestReceiver()), address(rcv));
         assertEq(address(sDAI.wxdai()), address(wxdai));
         assertEq(alice, address(10));
         assertEq(bob, address(11));
@@ -22,16 +23,110 @@ contract BridgeInterestReceiverTest is SetupTest {
     function testClaim() public {
         uint256 shares = sDAI.totalSupply();
         uint256 totalWithdrawable = sDAI.previewRedeem(shares);
-        testDonateWXDAI();
+        skipTime(1);
+        testTopInterestReceiver();
         uint256 sDAIBalance = wxdai.balanceOf(address(sDAI));
-        uint256 interestReceiverBalance = wxdai.balanceOf(address(interestReceiver));
+        uint256 rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
 
-        interestReceiver.claim();
-
+        uint256 claimed = rcv.claim();
+        
         assertLe(sDAIBalance, sDAI.totalAssets());
-        assertLe(interestReceiverBalance, wxdai.balanceOf(address(interestReceiver)));
+        assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         assertEq(sDAI.totalSupply(), shares);
-        assertLt(totalWithdrawable, sDAI.previewRedeem(shares));
+        assertLe(totalWithdrawable, sDAI.previewRedeem(shares));
+        assertGt(claimed, 0);
     }
 
+    function testFuzzClaim(uint256 time) public {
+        time = bound(time, 0 , 5 days);
+        require(time >= 0 && time<= 5 days);
+        console.log("GlobalTime: %s | Time: %s | CurrentTime: %s",globalTime, time, block.timestamp);
+        console.log("_nextClaimEpoch: %s | _lastClaimTimestamp: %s | dripRate: %s",rcv._nextClaimEpoch(),rcv._lastClaimTimestamp(),rcv.dripRate());
+
+        uint256 shares = sDAI.totalSupply();
+        uint256 totalWithdrawable = sDAI.previewRedeem(shares);
+        testTopInterestReceiver();
+        uint256 sDAIBalance = wxdai.balanceOf(address(sDAI));
+        uint256 rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+
+        uint256 endEpoch = rcv._nextClaimEpoch();
+        uint256 lastClaimTime = rcv._lastClaimTimestamp();
+        uint256 beforeRate = rcv.dripRate();
+       
+        skipTime(time); //skip time
+        uint256 claimable = rcv.previewClaimable(rcvBalance);
+        uint256 claimed = rcv.claim();
+
+        console.log("GlobalTime: %s | Time: %s | CurrentTime: %s",globalTime, time, block.timestamp);
+        console.log("_nextClaimEpoch: %s | _lastClaimTimestamp: %s | dripRate: %s",rcv._nextClaimEpoch(),rcv._lastClaimTimestamp(),rcv.dripRate());
+
+        if(globalTime == lastClaimTime){
+            assertEq(claimed,0);
+        }
+        else if (globalTime >= lastClaimTime + rcv.epochLength()){
+            assertEq(claimed,rcvBalance);
+            assertGe(rcv._nextClaimEpoch(), rcv._lastClaimTimestamp() + rcv.epochLength());
+            assertEq(claimable, claimed);
+        }
+        else{
+            if (beforeRate > 0){
+                assertGt(claimed,0);
+            }
+            assertEq(claimable, claimed);
+            assertLe(endEpoch, rcv._lastClaimTimestamp() + rcv.epochLength());
+        }
+
+        assertEq(wxdai.balanceOf(address(rcv)), rcvBalance - claimed);
+        assertEq(claimed, wxdai.balanceOf(address(sDAI)) - sDAIBalance);
+        assertEq(sDAI.totalSupply(), shares);
+        assertLe(sDAIBalance, sDAI.totalAssets());
+        assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
+        assertEq(sDAI.totalSupply(), shares);
+        assertLe(totalWithdrawable, sDAI.previewRedeem(shares));  
+    }
+
+
+    function testClaimDream() public {
+        uint256 shares = sDAI.totalSupply();
+        uint256 totalWithdrawable = sDAI.previewRedeem(shares);
+        testTopInterestReceiver();
+        uint256 sDAIBalance = wxdai.balanceOf(address(sDAI));
+        uint256 rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+        skipTime(1);
+        uint256 claimed = rcv.claim();
+
+        rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+        uint256 startDripRate = rcv.dripRate();
+
+        uint256 endEpoch = rcv._nextClaimEpoch();
+
+        skipTime(40000);
+        claimed = rcv.claim();
+
+        rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+
+        testTopInterestReceiver();
+
+        assertEq(startDripRate, rcv.dripRate());
+        assertGt(wxdai.balanceOf(address(rcv)), rcvBalance);
+
+        teleport(endEpoch);
+        claimed = rcv.claim();
+
+        rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+
+        skipTime(1000);
+        claimed = rcv.claim();
+
+        uint256 newDripRate = rcv.dripRate();
+
+        rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
+
+        assertLe(sDAIBalance, sDAI.totalAssets());
+        assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
+        assertEq(sDAI.totalSupply(), shares);
+        assertGt(startDripRate, newDripRate);
+        assertLe(totalWithdrawable, sDAI.previewRedeem(shares));
+
+    }
 }
