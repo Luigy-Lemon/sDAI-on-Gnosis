@@ -4,3 +4,10 @@ A tokenized wrapper of the Interest collected from Token Bridge deposits in sDAI
 
 # xDAI Interest Receiver
 WXDAI is moved into the sDAI vault contract using a continuous dripRate from BridgeInterestReceiver to avoid arbitrage abuse.
+
+
+# How to run tests
+
+- make install
+- make update
+- make tests

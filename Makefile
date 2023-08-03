@@ -3,13 +3,17 @@
 # (-include to ignore error if it does not exist)
 -include .env
 
+install	:; curl -L https://foundry.paradigm.xyz | bash && foundryup -v nightly-e05b9c75b4501d5880764948b61db787f3dd7fe0
+
 # deps
-update:; forge update
+update	:; forge update
 
 # Build & test
 build  :; forge build --sizes
 
-test   :; forge test -vvv
+tests	:; ./foundrySetup.sh
+
+fork	:; ./forkSetup.sh
 
 deploy-chiado :; forge script script/GnosisSavingsDAI.s.sol:GnosisSavingsDAIDeployer --rpc-url chiado --broadcast -vvvv
 

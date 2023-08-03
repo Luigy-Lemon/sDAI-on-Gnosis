@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: agpl-3
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import "./interfaces/IBridgeInterestReceiver.sol";
@@ -104,8 +104,7 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
     }
 
     receive() external payable {
-        if (msg.sender != address(wxdai))
-            revert();
+        require (msg.sender == address(wxdai),"No xDAI deposits");
     }
 
     // --- Approve by signature ---

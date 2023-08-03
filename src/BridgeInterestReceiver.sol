@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: agpl-3
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 import "openzeppelin/interfaces/IERC4626.sol";
 import "openzeppelin/proxy/utils/Initializable.sol";
@@ -13,7 +13,7 @@ contract BridgeInterestReceiver is Initializable {
     uint256 public dripRate;
     uint256 public _nextClaimEpoch;
     uint256 public _lastClaimTimestamp;
-    uint256 public epochLength = 1 days;
+    uint256 public epochLength = 30 hours;
 
     event Claimed(uint256 indexed amount);
 

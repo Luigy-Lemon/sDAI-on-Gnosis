@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import 'forge-std/console.sol';
@@ -11,14 +11,11 @@ contract GnosisSavingsDAITest is SetupTest{
 
     bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
-    function invariantMetadata() public {
+
+    function testMetadata() public {
         assertEq(address(sDAI.interestReceiver()), address(rcv));
         assertEq(address(sDAI.wxdai()), address(wxdai));
-        assertEq(alice, address(10));
-        assertEq(bob, address(11));
     }
-
-    
 
     /*//////////////////////////////////////////////////////////////
                         CORE LOGIC
@@ -131,11 +128,13 @@ contract GnosisSavingsDAITest is SetupTest{
         address receiver = alice;
         uint256 initialAssets = alice.balance;
         uint256 initialShares = sDAI.balanceOf(receiver);
+        uint256 expectedShares = sDAI.previewDeposit(assets);
 
         vm.startPrank(alice);
         uint256 shares = sDAI.depositXDAI{value:assets}(receiver);
         vm.stopPrank();
 
+        assertEq(expectedShares, shares);
         assertEq(sDAI.balanceOf(receiver), initialShares + shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(alice.balance, initialAssets - assets);
