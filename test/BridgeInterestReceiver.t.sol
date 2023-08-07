@@ -61,25 +61,29 @@ contract BridgeInterestReceiverTest is SetupTest {
 
         if(globalTime == lastClaimTime){
             assertEq(claimed,0);
+            assertGe(wxdai.balanceOf(address(rcv)) + address(rcv).balance, rcvBalance);
         }
         else if (globalTime >= lastClaimTime + rcv.epochLength()){
             assertEq(claimed,rcvBalance);
             assertGe(rcv._nextClaimEpoch(), rcv._lastClaimTimestamp() + rcv.epochLength());
             assertEq(claimable, claimed);
+            assertEq(address(rcv).balance, 0);
+            assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         }
         else{
             if (beforeRate > 0){
                 assertGt(claimed,0);
             }
+            assertEq(address(rcv).balance, 0);
             assertEq(claimable, claimed);
             assertLe(endEpoch, rcv._lastClaimTimestamp() + rcv.epochLength());
+            assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         }
 
-        assertEq(wxdai.balanceOf(address(rcv)), rcvBalance - claimed);
+        assertEq(wxdai.balanceOf(address(rcv)) + address(rcv).balance, rcvBalance - claimed);
         assertEq(claimed, wxdai.balanceOf(address(sDAI)) - sDAIBalance);
         assertEq(sDAI.totalSupply(), shares);
         assertLe(sDAIBalance, sDAI.totalAssets());
-        assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         assertEq(sDAI.totalSupply(), shares);
         assertLe(totalWithdrawable, sDAI.previewRedeem(shares));  
     }

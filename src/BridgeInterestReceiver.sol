@@ -24,6 +24,9 @@ contract BridgeInterestReceiver is Initializable {
     }
 
     function claim() external returns (uint256 claimed){
+        if (_lastClaimTimestamp == block.timestamp){
+            return 0;
+        }
         uint256 xDAIbalance = address(this).balance;
 
         if (xDAIbalance > 0) {

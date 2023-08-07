@@ -87,6 +87,9 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
 
     function depositXDAI(address receiver) public virtual payable returns (uint256) {
         uint256 assets = msg.value;
+        if (assets == 0){
+            return 0;
+        }
         interestReceiver.claim();
         uint256 shares = previewDeposit(assets);
         wxdai.deposit{value:assets}();
@@ -97,6 +100,9 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
     function withdrawXDAI(uint256 assets, address receiver, address owner) public virtual payable returns (uint256) {
         interestReceiver.claim();
         uint256 shares = withdraw(assets, address(this), owner);
+        if (shares == 0){
+            return 0;
+        }
         wxdai.withdraw(assets);
         (bool sent, ) = receiver.call{value: assets}("");
         require(sent, "Failed to send Ether");
