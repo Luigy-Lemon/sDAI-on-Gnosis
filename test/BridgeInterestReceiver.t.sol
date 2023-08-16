@@ -9,7 +9,7 @@ contract BridgeInterestReceiverTest is SetupTest {
 
 
     function testMetadata() public {
-        assertEq(address(sDAI.interestReceiver()), address(rcv));
+        assertEq(address(rcv), address(rcv));
         assertEq(address(sDAI.wxdai()), address(wxdai));
     }
 

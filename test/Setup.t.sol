@@ -6,6 +6,7 @@ import 'forge-std/console.sol';
 import {GnosisSavingsDAI} from 'src/GnosisSavingsDAI.sol';
 import {BridgeInterestReceiver} from 'src/BridgeInterestReceiver.sol';
 import {IWXDAI} from 'src/interfaces/IWXDAI.sol';
+import 'src/periphery/ClaimSavingsAdapter.sol';
 
 
 contract SetupTest is Test {
@@ -15,6 +16,7 @@ contract SetupTest is Test {
     address public bob = address(17);
     BridgeInterestReceiver public rcv;
     GnosisSavingsDAI public sDAI;
+    ClaimSavingsAdapter public adapter;
     IWXDAI public wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
     uint256 public globalTime;
 
@@ -33,8 +35,11 @@ contract SetupTest is Test {
         rcv = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(rcv));
 
-        sDAI = new GnosisSavingsDAI(address(rcv), "Savings DAI on Gnosis", "sDAI");
+        sDAI = new GnosisSavingsDAI("Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
+
+        adapter = new ClaimSavingsAdapter(address(rcv), payable(sDAI));
+        console.log('Deployed ClaimSavingsAdapter on Gnosis: %s', address(adapter));
         vm.stopPrank();
 
         vm.deal(address(rcv), 100 ether);
@@ -84,7 +89,7 @@ contract SetupTest is Test {
         // Bob does a donation
         vm.startPrank(bob);
         wxdai.transfer(address(sDAI), 10e18);
-        wxdai.transfer(address(sDAI.interestReceiver()), 100e18);
+        wxdai.transfer(address(rcv), 100e18);
         
         vm.stopPrank();
         assertEq(wxdai.balanceOf(address(sDAI)), sDAI.totalAssets());
@@ -95,7 +100,7 @@ contract SetupTest is Test {
         uint256 initialPreview = rcv.previewClaimable(10000);
         // Bob does a donation
         vm.startPrank(bob);
-        wxdai.transfer(address(sDAI.interestReceiver()), 1000e18);
+        wxdai.transfer(address(rcv), 1000e18);
         
         vm.stopPrank();
         assertEq(rcv.previewClaimable(10000), initialPreview);

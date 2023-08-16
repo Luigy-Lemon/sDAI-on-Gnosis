@@ -5,6 +5,7 @@ import 'forge-std/Script.sol';
 import 'forge-std/console.sol';
 import 'src/GnosisSavingsDAI.sol';
 import 'src/BridgeInterestReceiver.sol';
+import 'src/periphery/ClaimSavingsAdapter.sol';
 
 
 contract GnosisSavingsDAIDeployer is Script {
@@ -35,8 +36,11 @@ contract GnosisSavingsDAIDeployer is Script {
         BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(interestReceiver));
 
-        GnosisSavingsDAI sDAI = new GnosisSavingsDAI(address(interestReceiver), "Savings DAI on Gnosis", "sDAI");
+        GnosisSavingsDAI sDAI = new GnosisSavingsDAI("Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
+
+        ClaimSavingsAdapter adapter = new ClaimSavingsAdapter(address(interestReceiver), payable(sDAI));
+        console.log('Deployed ClaimSavingsAdapter on Gnosis: %s', address(adapter));
 
         interestReceiver.initialize(address(sDAI));
         console.log('Initialized InterestReceiver');
