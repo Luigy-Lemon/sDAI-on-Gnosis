@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: agpl-3
 pragma solidity ^0.8.20;
 
-import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import "../interfaces/IBridgeInterestReceiver.sol";
 import {IWXDAI} from "../interfaces/IWXDAI.sol";
 import {GnosisSavingsDAI} from "../GnosisSavingsDAI.sol";
-import {IERC20Permit} from "openzeppelin/token/ERC20/extensions/IERC20Permit.sol";
-import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
-import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
-import {Nonces} from "openzeppelin/utils/Nonces.sol";
 
 contract ClaimSavingsAdapter {
 
@@ -23,15 +18,18 @@ contract ClaimSavingsAdapter {
         interestReceiver = IBridgeInterestReceiver(interestReceiver_);
         sDAI = GnosisSavingsDAI(sDAI_);
         wxdai.approve(sDAI_, type(uint256).max);
+        
     }
 
     function deposit(uint256 assets, address receiver) public returns (uint256) {
         interestReceiver.claim();
+        wxdai.transferFrom(msg.sender, address(this), assets);
         return sDAI.deposit(assets, receiver);
     }
 
     function mint(uint256 shares, address receiver) public virtual returns (uint256) {
         interestReceiver.claim();
+        wxdai.transferFrom(msg.sender, address(this), sDAI.convertToAssets(shares));
         return sDAI.mint(shares, receiver);
     }
 

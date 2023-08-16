@@ -22,7 +22,7 @@ avalanche={key="${ETHERSCAN_API_KEY_AVALANCHE}",chainId=43114}
 polygon={key="${ETHERSCAN_API_KEY_POLYGON}",chainId=137}
 arbitrum={key="${ETHERSCAN_API_KEY_ARBITRUM}",chainId=42161}
 fantom={key="${ETHERSCAN_API_KEY_FANTOM}",chainId=250}
-gnosis={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=100}
+# gnosis={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=100}
 chiado={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=10200}
 
 [fuzz]
