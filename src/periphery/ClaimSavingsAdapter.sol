@@ -22,15 +22,17 @@ contract ClaimSavingsAdapter {
     }
 
     function deposit(uint256 assets, address receiver) public returns (uint256) {
-        interestReceiver.claim();
         wxdai.transferFrom(msg.sender, address(this), assets);
-        return sDAI.deposit(assets, receiver);
+        uint256 shares = sDAI.deposit(assets, receiver);
+        interestReceiver.claim();
+        return shares;
     }
 
     function mint(uint256 shares, address receiver) public virtual returns (uint256) {
-        interestReceiver.claim();
         wxdai.transferFrom(msg.sender, address(this), sDAI.convertToAssets(shares));
-        return sDAI.mint(shares, receiver);
+        uint256 assets = sDAI.mint(shares, receiver);
+        interestReceiver.claim();
+        return assets;
     }
 
     function withdraw(uint256 assets, address receiver, address owner) public virtual returns (uint256) {
@@ -48,8 +50,9 @@ contract ClaimSavingsAdapter {
         if (assets == 0){
             return 0;
         }
+        uint256 shares = sDAI.depositXDAI{value:assets}(receiver);
         interestReceiver.claim();
-        return sDAI.depositXDAI{value:assets}(receiver);
+        return shares;
     }
 
     function withdrawXDAI(uint256 assets, address receiver, address owner) public virtual returns (uint256) {
