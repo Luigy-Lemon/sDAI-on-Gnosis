@@ -2,17 +2,17 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import 'forge-std/console.sol';
+import "forge-std/console.sol";
 import "./Setup.t.sol";
 import "./Mocks/MockMultisig.sol";
 
-
-contract GnosisSavingsDAITest is SetupTest{
-
+contract SavingsXDaiTest is SetupTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    bytes32 constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
+    bytes32 constant PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
 
     function testMetadata() public {
         assertEq(address(rcv), address(rcv));
@@ -23,11 +23,12 @@ contract GnosisSavingsDAITest is SetupTest{
                         CORE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testTransferShares() public{
+    function testTransferShares() public {
         uint256 assets = 1e18;
         address sender = alice;
         vm.startPrank(sender);
-        uint256 shares = sDAI.depositXDAI{value:assets}(sender);
+        wxdai.approve(address(sDAI), assets);
+        uint256 shares = sDAI.deposit(assets, sender);
         assertGe(sDAI.balanceOf(sender), shares);
         assertGt(shares, 0);
         uint256 initialBalance_a = sDAI.balanceOf(sender);
@@ -42,8 +43,7 @@ contract GnosisSavingsDAITest is SetupTest{
         vm.stopPrank();
     }
 
-
-    function testDeposit() public{
+    function testDeposit() public {
         uint256 assets = 1e18;
         address receiver = alice;
         vm.startPrank(receiver);
@@ -54,7 +54,10 @@ contract GnosisSavingsDAITest is SetupTest{
         uint256 shares = sDAI.deposit(assets, receiver);
         console.log("totalAssets: %e", sDAI.totalAssets());
         console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
-        console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
+        console.log(
+            "previewRedeem: %e",
+            sDAI.previewRedeem(sDAI.balanceOf(receiver))
+        );
         console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
         assertEq(sDAI.balanceOf(receiver), shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
@@ -62,8 +65,7 @@ contract GnosisSavingsDAITest is SetupTest{
         vm.stopPrank();
     }
 
-
-    function testFuzzDeposit(uint256 assets) public{
+    function testFuzzDeposit(uint256 assets) public {
         address receiver = alice;
 
         uint256 initialAssets = wxdai.balanceOf(receiver);
@@ -125,11 +127,9 @@ contract GnosisSavingsDAITest is SetupTest{
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
 
         vm.stopPrank();
-
     }
 
-
-    function testFuzzRedeem(uint256 shares) public{
+    function testFuzzRedeem(uint256 shares) public {
         address receiver = alice;
         address owner = alice;
 
@@ -139,7 +139,7 @@ contract GnosisSavingsDAITest is SetupTest{
         uint256 initialShares = sDAI.balanceOf(owner);
 
         vm.assume(shares <= initialShares);
-        
+
         vm.startPrank(alice);
         vm.expectEmit();
         emit Transfer(receiver, address(0), shares);
@@ -150,61 +150,13 @@ contract GnosisSavingsDAITest is SetupTest{
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
 
         vm.stopPrank();
-
     }
-
-    function testDepositXDAI() public payable{
-        uint256 assets = 1e18;
-        address receiver = alice;
-        uint256 initialAssets = alice.balance;
-        uint256 initialShares = sDAI.balanceOf(receiver);
-        uint256 expectedShares = sDAI.previewDeposit(assets);
-
-        vm.startPrank(alice);
-        vm.expectEmit();
-        emit Transfer(address(0), receiver, sDAI.previewDeposit(assets));
-        uint256 shares = sDAI.depositXDAI{value:assets}(receiver);
-        vm.stopPrank();
-
-        assertEq(expectedShares, shares);
-        assertEq(sDAI.balanceOf(receiver), initialShares + shares);
-        assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
-        assertEq(alice.balance, initialAssets - assets);
-    }
-
-    function testWithdrawXDAI(uint256 assets) public payable{
-
-        address receiver = alice;
-        address owner = alice;
-
-        vm.assume(assets <= sDAI.maxWithdraw(receiver));
-        sDAI.deposit(assets, alice);
-
-        uint256 initialAssets = alice.balance;
-        uint256 initialShares = sDAI.balanceOf(alice);
-
-        vm.startPrank(alice);
-        vm.expectEmit();
-        emit Transfer(receiver, address(0), sDAI.previewWithdraw(assets));
-        uint256 shares = sDAI.withdrawXDAI(assets, receiver, owner);
-        vm.stopPrank();
-
-        assertEq(sDAI.balanceOf(receiver), initialShares - shares);
-        assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
-        assertEq(alice.balance, initialAssets + assets);
-        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0){
-            revert();
-        }
-
-    }
-
 
     /*//////////////////////////////////////////////////////////////
                         SPECIAL STATES
     //////////////////////////////////////////////////////////////*/
 
-    function testMintAndWithdraw(uint256 shares) public{
-
+    function testMintAndWithdraw(uint256 shares) public {
         uint256 initialAssets = wxdai.balanceOf(alice);
         vm.assume(shares < sDAI.convertToShares(initialAssets));
 
@@ -213,78 +165,69 @@ contract GnosisSavingsDAITest is SetupTest{
         wxdai.approve(address(sDAI), initialAssets);
         uint256 assets = sDAI.mint(shares, alice);
         uint256 shares2 = sDAI.withdraw(assets, alice, alice);
-        assertGe(shares2 , shares);
+        assertGe(shares2, shares);
 
         vm.stopPrank();
-
     }
 
     // checks that all deposit functions from deposit, depositXDAI and mint all return the same shares given equivalent inputs.
-    function test_CompareAllTypes_Deposits() public{
+    function test_CompareAllTypes_Deposits() public {
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
         uint256 wxdaiBalance = wxdai.balanceOf(alice);
 
         assertGe(wxdaiBalance, assets * 2);
-        assertGe(alice.balance,  assets);
+        assertGe(alice.balance, assets);
 
         wxdai.approve(address(sDAI), wxdaiBalance);
         uint256 sharesERC20_a = sDAI.deposit(assets, alice);
-        uint256 sharesRaw_a = sDAI.depositXDAI{value:assets}(alice);
         uint256 assetsERC20_a = sDAI.mint(sharesERC20_a, alice);
-        assertEq(sharesERC20_a, sharesRaw_a);
         assertEq(assetsERC20_a, assets);
-        vm.stopPrank(); 
-        vm.startPrank(bob);  
+        vm.stopPrank();
+        vm.startPrank(bob);
         wxdaiBalance = wxdai.balanceOf(bob);
         assertGe(wxdaiBalance, assets * 2);
-        assertGe(bob.balance,  assets);
+        assertGe(bob.balance, assets);
         wxdai.approve(address(sDAI), wxdaiBalance);
         uint256 sharesERC20_b = sDAI.deposit(assets, bob);
-        uint256 sharesRaw_b = sDAI.depositXDAI{value:assets}(bob); 
         uint256 assetsERC20_b = sDAI.mint(sharesERC20_b, bob);
-        assertEq(sharesERC20_b, sharesRaw_b);
         assertEq(assetsERC20_b, assets);
-        vm.stopPrank(); 
-        assertEq(sharesERC20_a, sharesRaw_b);
+        vm.stopPrank();
         assertGt(sharesERC20_a, 100);
     }
 
-   // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
+    // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
     function test_CompareAllTypes_Withdrawals() public{
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
         uint256 initialShares_a = sDAI.balanceOf(alice);
-        assertGt(alice.balance, assets * 3);
-        uint256 sharesDeposited_a = sDAI.depositXDAI{value:assets * 3}(alice);
+        assertGt(alice.balance, assets * 2);
+        wxdai.approve(address(sDAI),assets * 2);
+        uint256 sharesDeposited_a = sDAI.deposit(assets * 2, alice);
         uint256 sharesERC20_a = sDAI.withdraw(assets, alice, alice);
-        uint256 sharesRaw_a = sDAI.withdrawXDAI(assets, alice, alice);
         uint256 assetsERC20_a = sDAI.redeem(sharesERC20_a, alice, alice);
-        assertEq(sharesERC20_a, sharesRaw_a);
         assertEq(assetsERC20_a, assets);
         vm.stopPrank(); 
 
         vm.startPrank(bob);  
-        assertGt(bob.balance, assets * 3);
-        uint256 sharesDeposited_b = sDAI.depositXDAI{value:assets * 3}(bob);
+        assertGt(bob.balance, assets * 2);
+        wxdai.approve(address(sDAI),assets * 2);
+        uint256 sharesDeposited_b = sDAI.deposit(assets * 2, bob);
         uint256 sharesERC20_b = sDAI.withdraw(assets, bob, bob);
-        uint256 sharesRaw_b = sDAI.withdrawXDAI(assets, bob, bob);
         uint256 assetsERC20_b = sDAI.redeem(sharesERC20_a, bob, bob);
-        assertEq(sharesERC20_b, sharesRaw_b);
         assertEq(assetsERC20_b, assets);
         vm.stopPrank(); 
         assertEq(sDAI.balanceOf(alice), initialShares_a);
         assertEq(sharesDeposited_a,sharesDeposited_b);
-        assertEq(sharesERC20_a, sharesRaw_b);
+        assertEq(sharesERC20_a, sharesERC20_b);
         assertGt(sharesERC20_a, 100);
     }
 
     /*//////////////////////////////////////////////////////////////
                         PERMIT LOGIC 
     //////////////////////////////////////////////////////////////*/
-
 
     function testPermit() public {
         uint256 privateKey = 0xBEEF;
@@ -296,7 +239,16 @@ contract GnosisSavingsDAITest is SetupTest{
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            owner,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
                 )
             )
         );
@@ -307,7 +259,7 @@ contract GnosisSavingsDAITest is SetupTest{
         assertEq(sDAI.nonces(owner), 1);
     }
 
-     function testPermitContract() public {
+    function testPermitContract() public {
         uint256 privateKey1 = 0xBEEF;
         address signer1 = vm.addr(privateKey1);
         uint256 privateKey2 = 0xBEEE;
@@ -321,7 +273,16 @@ contract GnosisSavingsDAITest is SetupTest{
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            mockMultisig,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
                 )
             )
         );
@@ -332,14 +293,36 @@ contract GnosisSavingsDAITest is SetupTest{
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            mockMultisig,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
                 )
             )
         );
 
-        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
+        bytes memory signature = abi.encode(
+            r,
+            s,
+            bytes32(uint256(v) << 248),
+            r2,
+            s2,
+            bytes32(uint256(v2) << 248)
+        );
 
-        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
+        sDAI.permit(
+            mockMultisig,
+            address(0xCAFE),
+            1e18,
+            block.timestamp,
+            signature
+        );
 
         assertEq(sDAI.allowance(mockMultisig, address(0xCAFE)), 1e18);
         assertEq(sDAI.nonces(mockMultisig), 1);
@@ -359,7 +342,16 @@ contract GnosisSavingsDAITest is SetupTest{
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            mockMultisig,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
                 )
             )
         );
@@ -370,14 +362,36 @@ contract GnosisSavingsDAITest is SetupTest{
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(
+                        abi.encode(
+                            PERMIT_TYPEHASH,
+                            mockMultisig,
+                            address(0xCAFE),
+                            1e18,
+                            0,
+                            block.timestamp
+                        )
+                    )
                 )
             )
         );
 
-        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
+        bytes memory signature = abi.encode(
+            r,
+            s,
+            bytes32(uint256(v) << 248),
+            r2,
+            s2,
+            bytes32(uint256(v2) << 248)
+        );
 
-        vm.expectRevert("SavingsDai/invalid-permit");
-        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
+        vm.expectRevert("SavingsXDai/invalid-permit");
+        sDAI.permit(
+            mockMultisig,
+            address(0xCAFE),
+            1e18,
+            block.timestamp,
+            signature
+        );
     }
 }

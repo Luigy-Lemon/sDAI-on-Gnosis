@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 import 'forge-std/Script.sol';
 import 'forge-std/console.sol';
-import 'src/GnosisSavingsDAI.sol';
+import 'src/SavingsXDai.sol';
 import 'src/BridgeInterestReceiver.sol';
-import 'src/periphery/ClaimSavingsAdapter.sol';
+import 'src/periphery/SavingsXDaiAdapter.sol';
 
 
-contract GnosisSavingsDAIDeployer is Script {
+contract SavingsXDaiDeployer is Script {
 
     function run() external {
 
@@ -36,11 +36,11 @@ contract GnosisSavingsDAIDeployer is Script {
         BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(interestReceiver));
 
-        GnosisSavingsDAI sDAI = new GnosisSavingsDAI("Savings DAI on Gnosis", "sDAI");
+        SavingsXDai sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
 
-        ClaimSavingsAdapter adapter = new ClaimSavingsAdapter(address(interestReceiver), payable(sDAI));
-        console.log('Deployed ClaimSavingsAdapter on Gnosis: %s', address(adapter));
+        SavingsXDaiAdapter adapter = new SavingsXDaiAdapter(address(interestReceiver), payable(sDAI));
+        console.log('Deployed SavingsXDaiAdapter on Gnosis: %s', address(adapter));
 
         interestReceiver.initialize(address(sDAI));
         console.log('Initialized InterestReceiver');

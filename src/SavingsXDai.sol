@@ -17,7 +17,7 @@ interface IERC1271 {
     ) external view returns (bytes4);
 }
 
-contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
+contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
 
     IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
 
@@ -45,30 +45,8 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(block.chainid);
     }
 
-    function depositXDAI(address receiver) public virtual payable returns (uint256) {
-        uint256 assets = msg.value;
-        if (assets == 0){
-            return 0;
-        }
-        uint256 shares = previewDeposit(assets);
-        wxdai.deposit{value:assets}();
-        _deposit(address(this), receiver, assets, shares);
-        return shares;
-    }
-
-    function withdrawXDAI(uint256 assets, address receiver, address owner) public virtual payable returns (uint256) {
-        uint256 shares = withdraw(assets, address(this), owner);
-        if (shares == 0){
-            return 0;
-        }
-        wxdai.withdraw(assets);
-        (bool sent, ) = receiver.call{value: assets}("");
-        require(sent, "Failed to send Ether");
-        return shares;
-    }
-
     receive() external payable {
-        require (msg.sender == address(wxdai),"No xDAI deposits");
+        revert("No xDAI deposits");
     }
 
     // --- Approve by signature ---
@@ -107,8 +85,8 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
         uint256 deadline,
         bytes memory signature
     ) public {
-        require(block.timestamp <= deadline, "SavingsDai/permit-expired");
-        require(owner != address(0), "SavingsDai/invalid-owner");
+        require(block.timestamp <= deadline, "SavingsXDai/permit-expired");
+        require(owner != address(0), "SavingsXDai/invalid-owner");
 
         uint256 nonce = _useNonce(owner);
 
@@ -126,7 +104,7 @@ contract GnosisSavingsDAI is ERC4626, IERC20Permit, EIP712, Nonces{
                 ))
             ));
 
-        require(_isValidSignature(owner, digest, signature), "SavingsDai/invalid-permit");
+        require(_isValidSignature(owner, digest, signature), "SavingsXDai/invalid-permit");
 
         _approve(owner, spender, value);
         emit Approval(owner, spender, value);

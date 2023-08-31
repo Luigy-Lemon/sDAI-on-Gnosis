@@ -2,11 +2,10 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import 'forge-std/console.sol';
+import "forge-std/console.sol";
 import "./Setup.t.sol";
 
-contract ClaimSavingsAdapterTest is SetupTest{
-
+contract SavingsXDaiAdapterTest is SetupTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     function testMetadata() public {
@@ -18,7 +17,7 @@ contract ClaimSavingsAdapterTest is SetupTest{
                         CORE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function testDeposit() public{
+    function testDeposit() public {
         uint256 assets = 1e18;
         address receiver = alice;
         vm.startPrank(receiver);
@@ -28,7 +27,10 @@ contract ClaimSavingsAdapterTest is SetupTest{
         uint256 shares = adapter.deposit(assets, receiver);
         console.log("totalAssets: %e", sDAI.totalAssets());
         console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
-        console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
+        console.log(
+            "previewRedeem: %e",
+            sDAI.previewRedeem(sDAI.balanceOf(receiver))
+        );
         console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
         assertEq(sDAI.balanceOf(receiver), shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
@@ -36,8 +38,7 @@ contract ClaimSavingsAdapterTest is SetupTest{
         vm.stopPrank();
     }
 
-
-    function testFuzzDeposit(uint256 assets) public{
+    function testFuzzDeposit(uint256 assets) public {
         address receiver = alice;
 
         uint256 initialAssets = wxdai.balanceOf(receiver);
@@ -97,11 +98,9 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
 
         vm.stopPrank();
-
     }
 
-
-    function testFuzzRedeem(uint256 shares) public{
+    function testFuzzRedeem(uint256 shares) public {
         address receiver = alice;
         address owner = alice;
 
@@ -111,10 +110,10 @@ contract ClaimSavingsAdapterTest is SetupTest{
         uint256 initialShares = sDAI.balanceOf(owner);
 
         vm.assume(shares <= initialShares);
-        
+
         vm.startPrank(alice);
         sDAI.approve(address(adapter), shares);
-        
+
         uint256 assets = adapter.redeem(shares, receiver, owner);
 
         assertEq(sDAI.balanceOf(owner), initialShares - shares);
@@ -122,10 +121,9 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
 
         vm.stopPrank();
-
     }
 
-    function testDepositXDAI() public payable{
+    function testDepositXDAI() public payable {
         uint256 assets = 1e18;
         address receiver = alice;
         uint256 initialAssets = alice.balance;
@@ -134,7 +132,7 @@ contract ClaimSavingsAdapterTest is SetupTest{
 
         vm.startPrank(alice);
 
-        uint256 shares = adapter.depositXDAI{value:assets}(receiver);
+        uint256 shares = adapter.depositXDAI{value: assets}(receiver);
         vm.stopPrank();
 
         assertEq(expectedShares, shares);
@@ -143,8 +141,29 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertEq(alice.balance, initialAssets - assets);
     }
 
-    function testWithdrawXDAI(uint256 assets) public payable{
+    function testXDaiTransfer() public payable {
+        uint256 assets = 1e18;
+        address receiver = alice;
+        uint256 initialAssets = alice.balance;
+        uint256 initialShares = sDAI.balanceOf(receiver);
+        uint256 expectedShares = sDAI.previewDeposit(assets);
 
+        vm.startPrank(receiver);
+
+        (bool y, ) = address(adapter).call{
+            value: assets
+        }("");
+        assertEq(y, true);
+
+        uint256 shares = sDAI.balanceOf(receiver);
+
+        assertEq(expectedShares, shares);
+        assertEq(sDAI.balanceOf(receiver), initialShares + shares);
+        assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
+        assertEq(alice.balance, initialAssets - assets);
+    }
+
+    function testWithdrawXDAI(uint256 assets) public payable {
         address receiver = alice;
         address owner = alice;
 
@@ -163,14 +182,12 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertEq(sDAI.balanceOf(receiver), initialShares - shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(alice.balance, initialAssets + assets);
-        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0){
+        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
             revert();
         }
-
     }
 
-    function testRedeemAll() public{
-
+    function testRedeemAll() public {
         address receiver = alice;
         address owner = alice;
 
@@ -188,15 +205,16 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
         assertEq(0, sDAI.maxWithdraw(owner));
         assertEq(receiver.balance, initialAssets);
-        assertEq(wxdai.balanceOf(receiver), initialWXDAI + sDAI.convertToAssets(shares));
-        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0){
+        assertEq(
+            wxdai.balanceOf(receiver),
+            initialWXDAI + sDAI.convertToAssets(shares)
+        );
+        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
             revert();
         }
-
     }
 
-    function testRedeemAllXDAI() public{
-
+    function testRedeemAllXDAI() public {
         address receiver = alice;
         address owner = alice;
 
@@ -212,20 +230,20 @@ contract ClaimSavingsAdapterTest is SetupTest{
         assertEq(sDAI.balanceOf(owner), 0);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
         assertEq(sDAI.maxWithdraw(owner), 0);
-        assertEq(receiver.balance, initialAssets + sDAI.convertToAssets(shares));
-        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0){
+        assertEq(
+            receiver.balance,
+            initialAssets + sDAI.convertToAssets(shares)
+        );
+        if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
             revert();
         }
-
     }
-
 
     /*//////////////////////////////////////////////////////////////
                         SPECIAL STATES
     //////////////////////////////////////////////////////////////*/
 
-    function testMintAndWithdraw(uint256 shares) public{
-
+    function testMintAndWithdraw(uint256 shares) public {
         uint256 initialAssets = wxdai.balanceOf(alice);
         vm.assume(shares < sDAI.convertToShares(initialAssets));
 
@@ -235,74 +253,74 @@ contract ClaimSavingsAdapterTest is SetupTest{
         uint256 assets = adapter.mint(shares, alice);
         sDAI.approve(address(adapter), shares);
         uint256 shares2 = adapter.withdraw(assets, alice, alice);
-        assertGe(shares2 , shares);
+        assertGe(shares2, shares);
 
         vm.stopPrank();
-
     }
 
     // checks that all deposit functions from deposit, depositXDAI and mint all return the same shares given equivalent inputs.
-    function test_CompareAllTypes_Deposits() public{
+    function test_CompareAllTypes_Deposits() public {
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
         uint256 wxdaiBalance = wxdai.balanceOf(alice);
 
         assertGe(wxdaiBalance, assets * 2);
-        assertGe(alice.balance,  assets);
+        assertGe(alice.balance, assets);
 
         wxdai.approve(address(adapter), wxdaiBalance);
         uint256 sharesERC20_a = adapter.deposit(assets, alice);
-        uint256 sharesRaw_a = adapter.depositXDAI{value:assets}(alice);
+        uint256 sharesRaw_a = adapter.depositXDAI{value: assets}(alice);
         uint256 assetsERC20_a = adapter.mint(sharesERC20_a, alice);
         assertEq(sharesERC20_a, sharesRaw_a);
         assertEq(assetsERC20_a, assets);
-        vm.stopPrank(); 
-        vm.startPrank(bob);  
+        vm.stopPrank();
+        vm.startPrank(bob);
         wxdaiBalance = wxdai.balanceOf(bob);
         assertGe(wxdaiBalance, assets * 2);
-        assertGe(bob.balance,  assets);
+        assertGe(bob.balance, assets);
         wxdai.approve(address(adapter), wxdaiBalance);
         uint256 sharesERC20_b = adapter.deposit(assets, bob);
-        uint256 sharesRaw_b = adapter.depositXDAI{value:assets}(bob); 
+        uint256 sharesRaw_b = adapter.depositXDAI{value: assets}(bob);
         uint256 assetsERC20_b = adapter.mint(sharesERC20_b, bob);
         assertEq(sharesERC20_b, sharesRaw_b);
         assertEq(assetsERC20_b, assets);
-        vm.stopPrank(); 
+        vm.stopPrank();
         assertEq(sharesERC20_a, sharesRaw_b);
         assertGt(sharesERC20_a, 100);
     }
 
-   // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
-    function test_CompareAllTypes_Withdrawals() public{
+    // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
+    function test_CompareAllTypes_Withdrawals() public {
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
         uint256 initialShares_a = sDAI.balanceOf(alice);
         assertGt(alice.balance, assets * 3);
-        uint256 sharesDeposited_a = adapter.depositXDAI{value:assets * 3}(alice);
+        uint256 sharesDeposited_a = adapter.depositXDAI{value: assets * 3}(
+            alice
+        );
         sDAI.approve(address(adapter), sharesDeposited_a);
         uint256 sharesERC20_a = adapter.withdraw(assets, alice, alice);
         uint256 sharesRaw_a = adapter.withdrawXDAI(assets, alice, alice);
         uint256 assetsERC20_a = adapter.redeem(sharesERC20_a, alice, alice);
         assertEq(sharesERC20_a, sharesRaw_a);
         assertEq(assetsERC20_a, assets);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
-        vm.startPrank(bob);  
+        vm.startPrank(bob);
         assertGt(bob.balance, assets * 3);
-        uint256 sharesDeposited_b = adapter.depositXDAI{value:assets * 3}(bob);
+        uint256 sharesDeposited_b = adapter.depositXDAI{value: assets * 3}(bob);
         sDAI.approve(address(adapter), sharesDeposited_b);
         uint256 sharesERC20_b = adapter.withdraw(assets, bob, bob);
         uint256 sharesRaw_b = adapter.withdrawXDAI(assets, bob, bob);
         uint256 assetsERC20_b = adapter.redeem(sharesERC20_a, bob, bob);
         assertEq(sharesERC20_b, sharesRaw_b);
         assertEq(assetsERC20_b, assets);
-        vm.stopPrank(); 
+        vm.stopPrank();
         assertEq(sDAI.balanceOf(alice), initialShares_a);
-        assertEq(sharesDeposited_a,sharesDeposited_b);
+        assertEq(sharesDeposited_a, sharesDeposited_b);
         assertEq(sharesERC20_a, sharesRaw_b);
         assertGt(sharesERC20_a, 100);
     }
-
 }

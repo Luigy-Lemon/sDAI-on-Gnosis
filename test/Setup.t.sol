@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import 'forge-std/console.sol';
-import {GnosisSavingsDAI} from 'src/GnosisSavingsDAI.sol';
+import {SavingsXDai} from 'src/SavingsXDai.sol';
 import {BridgeInterestReceiver} from 'src/BridgeInterestReceiver.sol';
 import {IWXDAI} from 'src/interfaces/IWXDAI.sol';
-import 'src/periphery/ClaimSavingsAdapter.sol';
+import 'src/periphery/SavingsXDaiAdapter.sol';
 
 
 contract SetupTest is Test {
@@ -15,8 +15,8 @@ contract SetupTest is Test {
     address public alice = address(16);
     address public bob = address(17);
     BridgeInterestReceiver public rcv;
-    GnosisSavingsDAI public sDAI;
-    ClaimSavingsAdapter public adapter;
+    SavingsXDai public sDAI;
+    SavingsXDaiAdapter public adapter;
     IWXDAI public wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
     uint256 public globalTime;
 
@@ -35,16 +35,17 @@ contract SetupTest is Test {
         rcv = new BridgeInterestReceiver();
         console.log('Deployed InterestReceiver: %s', address(rcv));
 
-        sDAI = new GnosisSavingsDAI("Savings DAI on Gnosis", "sDAI");
+        sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
         console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
 
-        adapter = new ClaimSavingsAdapter(address(rcv), payable(sDAI));
-        console.log('Deployed ClaimSavingsAdapter on Gnosis: %s', address(adapter));
+        adapter = new SavingsXDaiAdapter(address(rcv), payable(sDAI));
+        console.log('Deployed SavingsXDaiAdapter on Gnosis: %s', address(adapter));
         vm.stopPrank();
 
         vm.deal(address(rcv), 100 ether);
 
-        testInitialize();
+        deal(address(wxdai), initializer, 100e18);
+        assertEq(wxdai.balanceOf(initializer), 100e18);
         
         deal(address(wxdai), alice, 100e18);
         assertEq(wxdai.balanceOf(alice), 100e18);
@@ -54,6 +55,8 @@ contract SetupTest is Test {
 
         deal(address(wxdai), address(rcv), 100e18);
         assertEq(wxdai.balanceOf(address(rcv)), 100e18);
+
+        testInitialize();
     }
 
 
@@ -72,11 +75,13 @@ contract SetupTest is Test {
             console.log("already initialized");
         }
         globalTime = block.timestamp;
-        sDAI.depositXDAI{value:1e18}(initializer);
+        wxdai.approve(address(sDAI), 10e18);
+        sDAI.deposit(10e18, initializer);
         vm.stopPrank();
 
         vm.startPrank(bob);
-        sDAI.depositXDAI{value:10e18}(bob);
+        wxdai.approve(address(sDAI), 10e18);
+        sDAI.deposit(10e18, bob);
         vm.stopPrank();
     }
 
