@@ -6,7 +6,7 @@ import "openzeppelin/proxy/utils/Initializable.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
 
 contract BridgeInterestReceiver is Initializable {
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public immutable wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
 
     address public vault;
 

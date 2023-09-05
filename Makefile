@@ -15,6 +15,6 @@ tests	:; ./foundrySetup.sh
 
 fork	:; ./forkSetup.sh
 
-deploy-chiado :; forge script script/SavingsXDAI.s.sol:SavingsXDAIDeployer --rpc-url chiado --broadcast -vvvv
+deploy-chiado :; forge script script/SavingsXDaiDeployer.s.sol:SavingsXDaiDeployer --rpc-url chiado --broadcast --verify --verifier sourcify -vvv
 
-deploy-gnosis :; forge script script/SavingsXDAI.s.sol:SavingsXDAIDeployer --rpc-url gnosis --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY_GNOSIS} -vvvv
+deploy-gnosis :; forge script script/SavingsXDaiDeployer.s.sol:SavingsXDaiDeployer --rpc-url gnosis --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY_GNOSIS} -vvvv

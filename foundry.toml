@@ -5,6 +5,7 @@ script = 'script'
 out = 'out'
 libs = ['lib']
 remappings = []
+emv_version = 'london'
 
 [rpc_endpoints]
 mainnet = "${RPC_MAINNET}"
