@@ -114,6 +114,10 @@ contract SavingsXDaiAdapter {
         return assets;
     }
 
+    function vaultAPY() external returns (uint256){
+        return interestReceiver.vaultAPY();
+    }
+
     receive() external payable {
         if (msg.sender != address(wxdai)){
             depositXDAI(msg.sender);

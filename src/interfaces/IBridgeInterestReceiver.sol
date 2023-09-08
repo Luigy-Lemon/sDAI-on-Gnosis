@@ -5,6 +5,7 @@ interface IBridgeInterestReceiver{
 
   function claim() external;
 
+  function vaultAPY() external returns(uint256);
 }
 
    
