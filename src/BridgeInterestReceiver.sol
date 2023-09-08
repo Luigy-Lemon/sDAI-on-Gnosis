@@ -7,12 +7,8 @@ import {IWXDAI} from "./interfaces/IWXDAI.sol";
 import {SavingsXDai} from "./SavingsXDai.sol";
 
 contract BridgeInterestReceiver is Initializable {
-<<<<<<< HEAD
     IWXDAI public immutable wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
 
-=======
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
->>>>>>> 074b72e (add vaultAPY function that returns current sDAI vault APY based on current interest being relayed to the receiver and the amount of deposits)
     address public vault;
     SavingsXDai private sDAI;
 
