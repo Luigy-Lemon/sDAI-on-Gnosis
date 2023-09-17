@@ -1,10 +1,7 @@
 pragma solidity ^0.8.19;
 
 interface IERC1271 {
-    function isValidSignature(
-        bytes32,
-        bytes memory
-    ) external view returns (bytes4);
+    function isValidSignature(bytes32, bytes memory) external view returns (bytes4);
 }
 
 contract MockMultisig is IERC1271 {

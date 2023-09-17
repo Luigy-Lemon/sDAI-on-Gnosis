@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import 'forge-std/console.sol';
-import {SavingsXDai} from 'src/SavingsXDai.sol';
-import {BridgeInterestReceiver} from 'src/BridgeInterestReceiver.sol';
-import {IWXDAI} from 'src/interfaces/IWXDAI.sol';
-import 'src/periphery/SavingsXDaiAdapter.sol';
-
+import "forge-std/console.sol";
+import {SavingsXDai} from "src/SavingsXDai.sol";
+import {BridgeInterestReceiver} from "src/BridgeInterestReceiver.sol";
+import {IWXDAI} from "src/interfaces/IWXDAI.sol";
+import "src/periphery/SavingsXDaiAdapter.sol";
 
 contract SetupTest is Test {
-
     address public initializer = address(15);
     address public alice = address(16);
     address public bob = address(17);
     BridgeInterestReceiver public rcv;
     SavingsXDai public sDAI;
     SavingsXDaiAdapter public adapter;
-    IWXDAI public wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
     uint256 public globalTime;
 
     function setUp() public payable {
-
         vm.deal(address(this), 100 ether);
         vm.deal(initializer, 100 ether);
         vm.deal(alice, 10000 ether);
@@ -33,20 +30,20 @@ contract SetupTest is Test {
         //////////////////////////////////////////////////////////////*/
 
         rcv = new BridgeInterestReceiver();
-        console.log('Deployed InterestReceiver: %s', address(rcv));
+        console.log("Deployed InterestReceiver: %s", address(rcv));
 
         sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
-        console.log('Deployed sDAI on Gnosis: %s', address(sDAI));
+        console.log("Deployed sDAI on Gnosis: %s", address(sDAI));
 
         adapter = new SavingsXDaiAdapter(address(rcv), payable(sDAI));
-        console.log('Deployed SavingsXDaiAdapter on Gnosis: %s', address(adapter));
+        console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
         vm.stopPrank();
 
         vm.deal(address(rcv), 100 ether);
 
         deal(address(wxdai), initializer, 100e18);
         assertEq(wxdai.balanceOf(initializer), 100e18);
-        
+
         deal(address(wxdai), alice, 100e18);
         assertEq(wxdai.balanceOf(alice), 100e18);
 
@@ -59,7 +56,6 @@ contract SetupTest is Test {
         testInitialize();
     }
 
-
     /*//////////////////////////////////////////////////////////////
                         INITIALIZER
     //////////////////////////////////////////////////////////////*/
@@ -68,10 +64,9 @@ contract SetupTest is Test {
         address vault = address(sDAI);
 
         vm.startPrank(initializer);
-        try rcv.initialize(vault){
+        try rcv.initialize(vault) {
             console.log("initialized");
-        }
-        catch {
+        } catch {
             console.log("already initialized");
         }
         globalTime = block.timestamp;
@@ -85,7 +80,6 @@ contract SetupTest is Test {
         vm.stopPrank();
     }
 
-
     /*//////////////////////////////////////////////////////////////
                         BASIC TRANSFERS
     //////////////////////////////////////////////////////////////*/
@@ -95,45 +89,44 @@ contract SetupTest is Test {
         vm.startPrank(bob);
         wxdai.transfer(address(sDAI), 10e18);
         wxdai.transfer(address(rcv), 100e18);
-        
+
         vm.stopPrank();
         assertEq(wxdai.balanceOf(address(sDAI)), sDAI.totalAssets());
         assertGe(sDAI.previewRedeem(10000), initialPreview);
     }
 
-    function testTopInterestReceiver() public{
+    function testTopInterestReceiver() public {
         uint256 initialPreview = rcv.previewClaimable(10000);
         // Bob does a donation
         vm.startPrank(bob);
         wxdai.transfer(address(rcv), 1000e18);
-        
+
         vm.stopPrank();
         assertEq(rcv.previewClaimable(10000), initialPreview);
     }
 
-    function testTransferXDAI() public{
+    function testTransferXDAI() public {
         uint256 value = 1e16;
-        address payable _to  = payable(sDAI);
+        address payable _to = payable(sDAI);
         bool sent;
         vm.expectRevert(bytes("No xDAI deposits"));
-        (sent ) = _to.send(value);
+        (sent) = _to.send(value);
         vm.expectRevert(bytes("No xDAI deposits"));
-        (sent, ) = _to.call{value: value}("");
+        (sent,) = _to.call{value: value}("");
         vm.expectRevert(bytes("No xDAI deposits"));
         _to.transfer(value);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                         UTILS
     //////////////////////////////////////////////////////////////*/
 
-    function teleport(uint256 _timestamp) public{
+    function teleport(uint256 _timestamp) public {
         globalTime = _timestamp;
         vm.warp(globalTime);
     }
 
-    function skipTime(uint256 secs) public{
+    function skipTime(uint256 secs) public {
         globalTime += secs;
         vm.warp(globalTime);
     }
