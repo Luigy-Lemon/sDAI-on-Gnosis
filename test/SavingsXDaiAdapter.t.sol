@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -27,10 +27,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
         uint256 shares = adapter.deposit(assets, receiver);
         console.log("totalAssets: %e", sDAI.totalAssets());
         console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
-        console.log(
-            "previewRedeem: %e",
-            sDAI.previewRedeem(sDAI.balanceOf(receiver))
-        );
+        console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
         console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
         assertEq(sDAI.balanceOf(receiver), shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
@@ -150,9 +147,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
 
         vm.startPrank(receiver);
 
-        (bool y, ) = address(adapter).call{
-            value: assets
-        }("");
+        (bool y,) = address(adapter).call{value: assets}("");
         assertEq(y, true);
 
         uint256 shares = sDAI.balanceOf(receiver);
@@ -205,10 +200,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
         assertEq(0, sDAI.maxWithdraw(owner));
         assertEq(receiver.balance, initialAssets);
-        assertEq(
-            wxdai.balanceOf(receiver),
-            initialWXDAI + sDAI.convertToAssets(shares)
-        );
+        assertEq(wxdai.balanceOf(receiver), initialWXDAI + sDAI.convertToAssets(shares));
         if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
             revert();
         }
@@ -230,10 +222,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
         assertEq(sDAI.balanceOf(owner), 0);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
         assertEq(sDAI.maxWithdraw(owner), 0);
-        assertEq(
-            receiver.balance,
-            initialAssets + sDAI.convertToAssets(shares)
-        );
+        assertEq(receiver.balance, initialAssets + sDAI.convertToAssets(shares));
         if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
             revert();
         }
@@ -297,9 +286,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
         vm.startPrank(alice);
         uint256 initialShares_a = sDAI.balanceOf(alice);
         assertGt(alice.balance, assets * 3);
-        uint256 sharesDeposited_a = adapter.depositXDAI{value: assets * 3}(
-            alice
-        );
+        uint256 sharesDeposited_a = adapter.depositXDAI{value: assets * 3}(alice);
         sDAI.approve(address(adapter), sharesDeposited_a);
         uint256 sharesERC20_a = adapter.withdraw(assets, alice, alice);
         uint256 sharesRaw_a = adapter.withdrawXDAI(assets, alice, alice);

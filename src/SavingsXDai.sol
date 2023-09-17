@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: agpl-3
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
 import "./interfaces/IBridgeInterestReceiver.sol";
@@ -9,24 +9,20 @@ import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
 import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
 import {Nonces} from "openzeppelin/utils/Nonces.sol";
 
-
 interface IERC1271 {
-    function isValidSignature(
-        bytes32,
-        bytes memory
-    ) external view returns (bytes4);
+    function isValidSignature(bytes32, bytes memory) external view returns (bytes4);
 }
 
-contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
+contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces {
+    IWXDAI public immutable wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
 
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
-
-     // --- EIP712 niceties ---
+    // --- EIP712 niceties ---
     uint256 public immutable deploymentChainId;
     bytes32 private immutable _DOMAIN_SEPARATOR;
-    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    string  public constant VERSION  = "1";
-    
+    bytes32 public constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    string public constant VERSION = "1";
+
     /**
      * @dev Permit deadline has expired.
      */
@@ -40,7 +36,11 @@ contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
     /**
      * @dev Set the underlying asset contract. This must be an ERC20-compatible contract (ERC20 or ERC777).
      */
-    constructor(string memory _name, string memory _ticker) ERC20(_name, _ticker) ERC4626(IERC20(address(wxdai))) EIP712(_name, "1") {
+    constructor(string memory _name, string memory _ticker)
+        ERC20(_name, _ticker)
+        ERC4626(IERC20(address(wxdai)))
+        EIP712(_name, "1")
+    {
         deploymentChainId = block.chainid;
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(block.chainid);
     }
@@ -51,11 +51,7 @@ contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
 
     // --- Approve by signature ---
 
-    function _isValidSignature(
-        address signer,
-        bytes32 digest,
-        bytes memory signature
-    ) internal view returns (bool) {
+    function _isValidSignature(address signer, bytes32 digest, bytes memory signature) internal view returns (bool) {
         if (signature.length == 65) {
             bytes32 r;
             bytes32 s;
@@ -70,39 +66,24 @@ contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
             }
         }
 
-        (bool success, bytes memory result) = signer.staticcall(
-            abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature)
-        );
-        return (success &&
-            result.length == 32 &&
-            abi.decode(result, (bytes4)) == IERC1271.isValidSignature.selector);
+        (bool success, bytes memory result) =
+            signer.staticcall(abi.encodeWithSelector(IERC1271.isValidSignature.selector, digest, signature));
+        return (success && result.length == 32 && abi.decode(result, (bytes4)) == IERC1271.isValidSignature.selector);
     }
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        bytes memory signature
-    ) public {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory signature) public {
         require(block.timestamp <= deadline, "SavingsXDai/permit-expired");
         require(owner != address(0), "SavingsXDai/invalid-owner");
 
         uint256 nonce = _useNonce(owner);
 
-        bytes32 digest =
-            keccak256(abi.encodePacked(
+        bytes32 digest = keccak256(
+            abi.encodePacked(
                 "\x19\x01",
                 block.chainid == deploymentChainId ? _DOMAIN_SEPARATOR : _calculateDomainSeparator(block.chainid),
-                keccak256(abi.encode(
-                    PERMIT_TYPEHASH,
-                    owner,
-                    spender,
-                    value,
-                    nonce,
-                    deadline
-                ))
-            ));
+                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonce, deadline))
+            )
+        );
 
         require(_isValidSignature(owner, digest, signature), "SavingsXDai/invalid-permit");
 
@@ -110,20 +91,15 @@ contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
         emit Approval(owner, spender, value);
     }
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
         permit(owner, spender, value, deadline, abi.encodePacked(r, s, v));
     }
     /**
      * @dev See {IERC20Permit-nonces}.
      */
+
     function nonces(address owner) public view virtual override(IERC20Permit, Nonces) returns (uint256) {
         return super.nonces(owner);
     }
@@ -147,5 +123,4 @@ contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces{
             )
         );
     }
-
 }

@@ -53,7 +53,7 @@ contract BridgeInterestReceiver is Initializable {
     function _calcClaimable(uint256 balance) internal returns (uint256 claimable) {
         uint256 unclaimedTime = block.timestamp - _lastClaimTimestamp;
 
-        // If a full epoch has passed since last claim, claim the full balance
+        // If a full epoch has passed since last claim, claim the full amount
         if (unclaimedTime >= epochLength) {
             claimable = balance;
         } else {

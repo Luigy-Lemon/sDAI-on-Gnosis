@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -10,9 +10,7 @@ contract SavingsXDaiTest is SetupTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     bytes32 constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function testMetadata() public {
         assertEq(address(rcv), address(rcv));
@@ -54,10 +52,7 @@ contract SavingsXDaiTest is SetupTest {
         uint256 shares = sDAI.deposit(assets, receiver);
         console.log("totalAssets: %e", sDAI.totalAssets());
         console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
-        console.log(
-            "previewRedeem: %e",
-            sDAI.previewRedeem(sDAI.balanceOf(receiver))
-        );
+        console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
         console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
         assertEq(sDAI.balanceOf(receiver), shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
@@ -198,29 +193,29 @@ contract SavingsXDaiTest is SetupTest {
     }
 
     // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
-    function test_CompareAllTypes_Withdrawals() public{
+    function test_CompareAllTypes_Withdrawals() public {
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
         uint256 initialShares_a = sDAI.balanceOf(alice);
         assertGt(alice.balance, assets * 2);
-        wxdai.approve(address(sDAI),assets * 2);
+        wxdai.approve(address(sDAI), assets * 2);
         uint256 sharesDeposited_a = sDAI.deposit(assets * 2, alice);
         uint256 sharesERC20_a = sDAI.withdraw(assets, alice, alice);
         uint256 assetsERC20_a = sDAI.redeem(sharesERC20_a, alice, alice);
         assertEq(assetsERC20_a, assets);
-        vm.stopPrank(); 
+        vm.stopPrank();
 
-        vm.startPrank(bob);  
+        vm.startPrank(bob);
         assertGt(bob.balance, assets * 2);
-        wxdai.approve(address(sDAI),assets * 2);
+        wxdai.approve(address(sDAI), assets * 2);
         uint256 sharesDeposited_b = sDAI.deposit(assets * 2, bob);
         uint256 sharesERC20_b = sDAI.withdraw(assets, bob, bob);
         uint256 assetsERC20_b = sDAI.redeem(sharesERC20_a, bob, bob);
         assertEq(assetsERC20_b, assets);
-        vm.stopPrank(); 
+        vm.stopPrank();
         assertEq(sDAI.balanceOf(alice), initialShares_a);
-        assertEq(sharesDeposited_a,sharesDeposited_b);
+        assertEq(sharesDeposited_a, sharesDeposited_b);
         assertEq(sharesERC20_a, sharesERC20_b);
         assertGt(sharesERC20_a, 100);
     }
@@ -239,16 +234,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            owner,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -273,16 +259,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            mockMultisig,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -293,36 +270,14 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            mockMultisig,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
 
-        bytes memory signature = abi.encode(
-            r,
-            s,
-            bytes32(uint256(v) << 248),
-            r2,
-            s2,
-            bytes32(uint256(v2) << 248)
-        );
+        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
 
-        sDAI.permit(
-            mockMultisig,
-            address(0xCAFE),
-            1e18,
-            block.timestamp,
-            signature
-        );
+        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
 
         assertEq(sDAI.allowance(mockMultisig, address(0xCAFE)), 1e18);
         assertEq(sDAI.nonces(mockMultisig), 1);
@@ -342,16 +297,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            mockMultisig,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -362,36 +308,14 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            mockMultisig,
-                            address(0xCAFE),
-                            1e18,
-                            0,
-                            block.timestamp
-                        )
-                    )
+                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
 
-        bytes memory signature = abi.encode(
-            r,
-            s,
-            bytes32(uint256(v) << 248),
-            r2,
-            s2,
-            bytes32(uint256(v2) << 248)
-        );
+        bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
 
         vm.expectRevert("SavingsXDai/invalid-permit");
-        sDAI.permit(
-            mockMultisig,
-            address(0xCAFE),
-            1e18,
-            block.timestamp,
-            signature
-        );
+        sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
     }
 }
