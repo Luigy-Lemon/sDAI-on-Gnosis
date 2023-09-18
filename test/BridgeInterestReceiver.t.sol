@@ -6,9 +6,41 @@ import "forge-std/console.sol";
 import "./Setup.t.sol";
 
 contract BridgeInterestReceiverTest is SetupTest {
+    /*//////////////////////////////////////////////////////////////
+                        BASIC VALIDATION
+    //////////////////////////////////////////////////////////////*/
     function testMetadata() public {
         assertEq(address(rcv), address(rcv));
         assertEq(address(sDAI.wxdai()), address(wxdai));
+    }
+
+    function testAlreadyInitialized() public {
+        vm.startPrank(initializer);
+        vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
+        rcv.initialize(address(sDAI));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        UNIT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testReceive() public{
+        vm.prank(address(0));
+        payable(rcv).call{value:10 ether}("");
+
+        skipTime(100);
+        vm.prank(address(0));
+        payable(rcv).call{value:100 ether}("");
+        uint256 beforeRate = rcv.BridgedRate();
+
+        skipTime(1000);
+
+        vm.prank(address(0));
+        payable(rcv).call{value:1000 ether}("");
+        uint256 finalRate = rcv.BridgedRate();
+
+        assertEq(finalRate, 1 ether);
+        assertEq(finalRate, beforeRate);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -38,9 +70,9 @@ contract BridgeInterestReceiverTest is SetupTest {
         require(time >= 0 && time <= 2 days);
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
         console.log(
-            "_nextClaimEpoch: %s | _lastClaimTimestamp: %s | dripRate: %s",
-            rcv._nextClaimEpoch(),
-            rcv._lastClaimTimestamp(),
+            "nextClaimEpoch: %s | lastClaimTimestamp: %s | dripRate: %s",
+            rcv.nextClaimEpoch(),
+            rcv.lastClaimTimestamp(),
             rcv.dripRate()
         );
 
@@ -50,8 +82,8 @@ contract BridgeInterestReceiverTest is SetupTest {
         uint256 sDAIBalance = wxdai.balanceOf(address(sDAI));
         uint256 rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
 
-        uint256 endEpoch = rcv._nextClaimEpoch();
-        uint256 lastClaimTime = rcv._lastClaimTimestamp();
+        uint256 endEpoch = rcv.nextClaimEpoch();
+        uint256 lastClaimTime = rcv.lastClaimTimestamp();
         uint256 beforeRate = rcv.dripRate();
 
         skipTime(time); //skip time
@@ -60,9 +92,9 @@ contract BridgeInterestReceiverTest is SetupTest {
 
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
         console.log(
-            "_nextClaimEpoch: %s | _lastClaimTimestamp: %s | dripRate: %s",
-            rcv._nextClaimEpoch(),
-            rcv._lastClaimTimestamp(),
+            "nextClaimEpoch: %s | lastClaimTimestamp: %s | dripRate: %s",
+            rcv.nextClaimEpoch(),
+            rcv.lastClaimTimestamp(),
             rcv.dripRate()
         );
 
@@ -72,7 +104,7 @@ contract BridgeInterestReceiverTest is SetupTest {
         } else if (globalTime >= lastClaimTime + rcv.epochLength()) {
             assertEq(claimed, rcvBalance);
             if (rcv.dripRate() > 0) {
-                assertEq(rcv._nextClaimEpoch(), rcv._lastClaimTimestamp() + rcv.epochLength());
+                assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + rcv.epochLength());
             }
             assertEq(claimable, claimed);
             assertEq(address(rcv).balance, 0);
@@ -83,7 +115,7 @@ contract BridgeInterestReceiverTest is SetupTest {
             }
             assertEq(address(rcv).balance, 0);
             assertEq(claimable, claimed);
-            assertLe(endEpoch, rcv._lastClaimTimestamp() + rcv.epochLength());
+            assertLe(endEpoch, rcv.lastClaimTimestamp() + rcv.epochLength());
             assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         }
 
@@ -96,8 +128,8 @@ contract BridgeInterestReceiverTest is SetupTest {
 
         vm.startPrank(bob);
         wxdai.transfer(address(rcv), 10e18);
-        endEpoch = rcv._nextClaimEpoch();
-        lastClaimTime = rcv._lastClaimTimestamp();
+        endEpoch = rcv.nextClaimEpoch();
+        lastClaimTime = rcv.lastClaimTimestamp();
         beforeRate = rcv.dripRate();
         rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
 
@@ -106,9 +138,9 @@ contract BridgeInterestReceiverTest is SetupTest {
         claimed = rcv.claim();
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
         console.log(
-            "_nextClaimEpoch: %s | _lastClaimTimestamp: %s | dripRate: %s",
-            rcv._nextClaimEpoch(),
-            rcv._lastClaimTimestamp(),
+            "nextClaimEpoch: %s | lastClaimTimestamp: %s | dripRate: %s",
+            rcv.nextClaimEpoch(),
+            rcv.lastClaimTimestamp(),
             rcv.dripRate()
         );
 
@@ -118,7 +150,7 @@ contract BridgeInterestReceiverTest is SetupTest {
         } else if (globalTime >= lastClaimTime + rcv.epochLength()) {
             assertEq(claimed, rcvBalance);
             if (rcv.dripRate() > 0) {
-                assertEq(rcv._nextClaimEpoch(), rcv._lastClaimTimestamp() + rcv.epochLength());
+                assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + rcv.epochLength());
             }
             assertEq(claimable, claimed);
             assertEq(address(rcv).balance, 0);
@@ -129,8 +161,12 @@ contract BridgeInterestReceiverTest is SetupTest {
             }
             assertEq(address(rcv).balance, 0);
             assertEq(claimable, claimed);
-            assertLe(endEpoch, rcv._lastClaimTimestamp() + rcv.epochLength());
+            assertLe(endEpoch, rcv.lastClaimTimestamp() + rcv.epochLength());
             assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         }
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        CONDITIONAL CHECKS
+    //////////////////////////////////////////////////////////////*/
 }
