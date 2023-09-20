@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
-import "./interfaces/IBridgeInterestReceiver.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
 import {IERC20Permit} from "openzeppelin/token/ERC20/extensions/IERC20Permit.sol";
 import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";

@@ -102,6 +102,9 @@ contract BridgeInterestReceiver is Initializable {
         return wxdai.balanceOf(address(this));
     }
 
+    /**
+     * @dev Emulates how much would be claimable given receiver address
+     */
     function previewClaimable(uint256 balance) external view returns (uint256 claimable) {
         uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
         // If a full epoch has passed since last claim, claim the full amount

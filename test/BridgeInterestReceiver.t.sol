@@ -24,19 +24,19 @@ contract BridgeInterestReceiverTest is SetupTest {
                         UNIT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testReceive() public{
+    function testReceive() public {
         vm.prank(address(0));
-        payable(rcv).call{value:10 ether}("");
+        payable(rcv).call{value: 10 ether}("");
 
         skipTime(100);
         vm.prank(address(0));
-        payable(rcv).call{value:100 ether}("");
+        payable(rcv).call{value: 100 ether}("");
         uint256 beforeRate = rcv.BridgedRate();
 
         skipTime(1000);
 
         vm.prank(address(0));
-        payable(rcv).call{value:1000 ether}("");
+        payable(rcv).call{value: 1000 ether}("");
         uint256 finalRate = rcv.BridgedRate();
 
         assertEq(finalRate, 1 ether);
