@@ -30,16 +30,16 @@ contract SavingsXDaiDeployer is Script {
                                 DEPLOYMENTS
         //////////////////////////////////////////////////////////////*/
 
-        BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver();
-        console.log("Deployed InterestReceiver: %s", address(interestReceiver));
-
         SavingsXDai sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
         console.log("Deployed sDAI on Gnosis: %s", address(sDAI));
+
+        BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver(address(sDAI));
+        console.log("Deployed InterestReceiver: %s", address(interestReceiver));
 
         SavingsXDaiAdapter adapter = new SavingsXDaiAdapter(address(interestReceiver), payable(sDAI));
         console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
 
-        interestReceiver.initialize(address(sDAI));
+        interestReceiver.initialize();
         console.log("Initialized InterestReceiver");
 
         vm.stopBroadcast();

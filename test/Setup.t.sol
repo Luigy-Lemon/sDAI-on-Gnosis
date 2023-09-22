@@ -17,6 +17,7 @@ contract SetupTest is Test {
     SavingsXDaiAdapter public adapter;
     IWXDAI public wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
     uint256 public globalTime;
+    uint256 public epoch;
 
     function setUp() public payable {
         vm.deal(address(this), 100 ether);
@@ -29,17 +30,15 @@ contract SetupTest is Test {
                                 DEPLOYMENTS
         //////////////////////////////////////////////////////////////*/
 
-        rcv = new BridgeInterestReceiver();
-        console.log("Deployed InterestReceiver: %s", address(rcv));
-
         sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
         console.log("Deployed sDAI on Gnosis: %s", address(sDAI));
+
+        rcv = new BridgeInterestReceiver(address(sDAI));
+        console.log("Deployed InterestReceiver: %s", address(rcv));
 
         adapter = new SavingsXDaiAdapter(address(rcv), payable(sDAI));
         console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
         vm.stopPrank();
-
-        vm.deal(address(rcv), 100 ether);
 
         deal(address(wxdai), initializer, 100e18);
         assertEq(wxdai.balanceOf(initializer), 100e18);
@@ -49,11 +48,8 @@ contract SetupTest is Test {
 
         deal(address(wxdai), bob, 10000e18);
         assertEq(wxdai.balanceOf(bob), 10000e18);
-
-        deal(address(wxdai), address(rcv), 100e18);
-        assertEq(wxdai.balanceOf(address(rcv)), 100e18);
-
-        testInitialize();
+        globalTime = block.timestamp;
+        epoch = rcv.epochLength();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -61,22 +57,12 @@ contract SetupTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testInitialize() public {
-        address vault = address(sDAI);
-
         vm.startPrank(initializer);
-        try rcv.initialize(vault) {
+        try rcv.initialize() {
             console.log("initialized");
         } catch {
             console.log("already initialized");
         }
-        globalTime = block.timestamp;
-        wxdai.approve(address(sDAI), 10e18);
-        sDAI.deposit(10e18, initializer);
-        vm.stopPrank();
-
-        vm.startPrank(bob);
-        wxdai.approve(address(sDAI), 10e18);
-        sDAI.deposit(10e18, bob);
         vm.stopPrank();
     }
 
@@ -95,14 +81,20 @@ contract SetupTest is Test {
         assertGe(sDAI.previewRedeem(10000), initialPreview);
     }
 
+    function donateReceiverWXDAI() public {
+        vm.startPrank(bob);
+        wxdai.transfer(address(rcv), 100e18);
+        vm.stopPrank();
+    }
+
     function testTopInterestReceiver() public {
-        uint256 initialPreview = rcv.previewClaimable(10000);
+        uint256 initialPreview = rcv.previewClaimable();
         // Bob does a donation
         vm.startPrank(bob);
         wxdai.transfer(address(rcv), 1000e18);
 
         vm.stopPrank();
-        assertEq(rcv.previewClaimable(10000), initialPreview);
+        assertEq(rcv.previewClaimable(), initialPreview);
     }
 
     function testTransferXDAI() public {

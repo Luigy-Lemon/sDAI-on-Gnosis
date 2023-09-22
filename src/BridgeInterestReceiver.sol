@@ -17,27 +17,34 @@ contract BridgeInterestReceiver is Initializable {
     uint256 public lastClaimTimestamp;
     uint256 private _lastClaimDeposits;
     uint256 public epochLength = 30 hours;
-    uint256 private _latestReceivedTimestamp;
     uint256 private _largeDepositTimestamp;
-    uint256 public BridgedRate;
 
     event Claimed(uint256 indexed amount);
 
-    /**
-     * @dev Initialize receiver with the sDAI vault
-     */
-    function initialize(address _vault) public payable initializer {
-        currentEpochBalance = _aggregateBalance();
-        lastClaimTimestamp = block.timestamp;
-        nextClaimEpoch = block.timestamp + epochLength;
-        dripRate = currentEpochBalance / epochLength;
+    constructor(address _vault) {
         vault = _vault;
         sDAI = SavingsXDai(payable(_vault));
     }
 
-    function claim() public returns (uint256 claimed) {
+    modifier isInitialized() {
+        require(_getInitializedVersion() > 0, "Not Initialized");
+        _;
+    }
+
+    /**
+     * @dev Initialize receiver, requires minimum balance to not set a dripRate of 0
+     */
+    function initialize() public payable initializer {
+        currentEpochBalance = _aggregateBalance();
+        //  require(currentEpochBalance > 10000 ether);
+        lastClaimTimestamp = block.timestamp;
+        nextClaimEpoch = block.timestamp + epochLength;
+        dripRate = currentEpochBalance / epochLength;
+    }
+
+    function claim() public isInitialized returns (uint256 claimed) {
         uint256 assets = sDAI.totalAssets();
-        // If large deposit intto vault index claim timestamp
+        // If large deposit into vault index claim timestamp
         if (assets > _lastClaimDeposits + 25000 ether) {
             _largeDepositTimestamp = block.timestamp;
         }
@@ -65,26 +72,27 @@ contract BridgeInterestReceiver is Initializable {
 
         // If a full epoch has passed since last claim, claim the full balance
         if (unclaimedTime >= epochLength) {
-            claimable = balance;
+            claimable = currentEpochBalance;
         } else {
             // otherwise release the amount dripped during that time
             claimable = unclaimedTime * dripRate;
             // update how much has already been claimed this epoch
             if (currentEpochBalance < claimable) {
                 claimable = currentEpochBalance;
+                currentEpochBalance = 0;
             } else {
                 currentEpochBalance -= claimable;
             }
         }
         // If current time is past next epoch starting time update dripRate
         if (block.timestamp > nextClaimEpoch) {
-            if ((balance - claimable) < epochLength) {
+            if ((balance - claimable) < 1 ether) {
                 // If post-claim balance too low wait for more deposits and set rate to 0
                 dripRate = 0;
             } else {
                 // If post-claim balance is significant set new dripRate and start a new Epoch
                 dripRate = (balance - claimable) / epochLength;
-                currentEpochBalance = balance;
+                currentEpochBalance = balance - claimable;
                 nextClaimEpoch = block.timestamp + epochLength;
             }
         }
@@ -105,11 +113,11 @@ contract BridgeInterestReceiver is Initializable {
     /**
      * @dev Emulates how much would be claimable given receiver address
      */
-    function previewClaimable(uint256 balance) external view returns (uint256 claimable) {
+    function previewClaimable() external view returns (uint256 claimable) {
         uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
         // If a full epoch has passed since last claim, claim the full amount
         if (unclaimedTime >= epochLength) {
-            claimable = balance;
+            claimable = currentEpochBalance;
         } else {
             // otherwise release the amount dripped during that time
             claimable = unclaimedTime * dripRate;
@@ -127,24 +135,7 @@ contract BridgeInterestReceiver is Initializable {
      */
     function vaultAPY() external view returns (uint256) {
         uint256 deposits = sDAI.totalAssets();
-        // if the bridged interest rate is available, use it.
-        // both rates are in wei, as xDAI per second
-        uint256 bestRate = (BridgedRate > 0) ? BridgedRate : dripRate;
-        uint256 annualYield = (bestRate * 365 days);
+        uint256 annualYield = (dripRate * 365 days);
         return (1 ether * annualYield) / deposits;
-    }
-
-    /**
-     * @dev handle raw xDAI transfers to the receiver
-     */
-    receive() external payable {
-        // check if xDAI is being minted from the bridge and value is significant (more than 1 xDAI)
-        if (msg.sender == address(0) && msg.value > 1 ether) {
-            // should never happen since there's a minInterestPaid on mainnet, but just to be sure
-            if (_latestReceivedTimestamp < block.timestamp) {
-                BridgedRate = (msg.value / (block.timestamp - _latestReceivedTimestamp));
-            }
-            _latestReceivedTimestamp = block.timestamp;
-        }
     }
 }

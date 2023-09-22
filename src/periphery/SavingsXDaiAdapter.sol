@@ -33,14 +33,18 @@ contract SavingsXDaiAdapter {
         return assets;
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual returns (uint256) {
+    function withdraw(uint256 assets, address receiver) public virtual returns (uint256) {
         interestReceiver.claim();
-        return sDAI.withdraw(assets, receiver, owner);
+        uint256 maxAssets = sDAI.maxWithdraw(msg.sender);
+        assets = (assets > maxAssets) ? maxAssets : assets;
+        return sDAI.withdraw(assets, receiver, msg.sender);
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public virtual returns (uint256) {
+    function redeem(uint256 shares, address receiver) public virtual returns (uint256) {
         interestReceiver.claim();
-        return sDAI.redeem(shares, receiver, owner);
+        uint256 maxShares = sDAI.maxRedeem(msg.sender);
+        shares = (shares > maxShares) ? maxShares : shares;
+        return sDAI.redeem(shares, receiver, msg.sender);
     }
 
     function depositXDAI(address receiver) public payable virtual returns (uint256) {
@@ -54,12 +58,12 @@ contract SavingsXDaiAdapter {
         return shares;
     }
 
-    function withdrawXDAI(uint256 assets, address receiver, address owner) public payable virtual returns (uint256) {
+    function withdrawXDAI(uint256 assets, address receiver) public payable virtual returns (uint256) {
         if (assets == 0) {
             return 0;
         }
         interestReceiver.claim();
-        uint256 shares = sDAI.withdraw(assets, address(this), owner);
+        uint256 shares = sDAI.withdraw(assets, address(this), msg.sender);
         uint256 balance = wxdai.balanceOf(address(this));
         wxdai.withdraw(balance);
         (bool sent,) = receiver.call{value: balance}("");
@@ -67,16 +71,16 @@ contract SavingsXDaiAdapter {
         return shares;
     }
 
-    function redeemAll(address receiver, address owner) public virtual returns (uint256) {
+    function redeemAll(address receiver) public virtual returns (uint256) {
         interestReceiver.claim();
-        uint256 shares = sDAI.balanceOf(owner);
-        return sDAI.redeem(shares, receiver, owner);
+        uint256 shares = sDAI.balanceOf(msg.sender);
+        return sDAI.redeem(shares, receiver, msg.sender);
     }
 
-    function redeemAllXDAI(address receiver, address owner) public payable virtual returns (uint256) {
+    function redeemAllXDAI(address receiver) public payable virtual returns (uint256) {
         interestReceiver.claim();
-        uint256 shares = sDAI.balanceOf(owner);
-        uint256 assets = sDAI.redeem(shares, address(this), owner);
+        uint256 shares = sDAI.balanceOf(msg.sender);
+        uint256 assets = sDAI.redeem(shares, address(this), msg.sender);
         wxdai.withdraw(assets);
         (bool sent,) = receiver.call{value: assets}("");
         require(sent, "Failed to send xDAI");

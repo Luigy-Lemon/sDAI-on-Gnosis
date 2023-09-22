@@ -46,6 +46,7 @@ contract SavingsXDaiTest is SetupTest {
         address receiver = alice;
         vm.startPrank(receiver);
         uint256 initialBalance = wxdai.balanceOf(receiver);
+        uint256 initialShares = sDAI.balanceOf(receiver);
         wxdai.approve(address(sDAI), initialBalance);
         vm.expectEmit();
         emit Transfer(address(0), receiver, sDAI.previewDeposit(assets));
@@ -54,7 +55,7 @@ contract SavingsXDaiTest is SetupTest {
         console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
         console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
         console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
-        assertEq(sDAI.balanceOf(receiver), shares);
+        assertEq(sDAI.balanceOf(receiver), shares + initialShares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(wxdai.balanceOf(receiver), initialBalance - assets);
         vm.stopPrank();
@@ -139,7 +140,7 @@ contract SavingsXDaiTest is SetupTest {
         vm.expectEmit();
         emit Transfer(receiver, address(0), shares);
         uint256 assets = sDAI.redeem(shares, receiver, owner);
-
+        console.log("assets: %e %e", initialAssets, assets);
         assertEq(sDAI.balanceOf(owner), initialShares - shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
