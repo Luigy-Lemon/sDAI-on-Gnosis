@@ -4,5 +4,7 @@ pragma solidity ^0.8.18;
 interface IBridgeInterestReceiver {
     function claim() external;
 
-    function vaultAPY() external returns (uint256);
+    function vaultAPY() external view returns (uint256);
+
+    function previewClaimable() external view returns (uint256);
 }

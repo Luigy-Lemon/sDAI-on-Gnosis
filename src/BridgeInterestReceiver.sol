@@ -16,7 +16,7 @@ contract BridgeInterestReceiver is Initializable {
     uint256 public currentEpochBalance;
     uint256 public lastClaimTimestamp;
     uint256 private _lastClaimDeposits;
-    uint256 public epochLength = 30 hours;
+    uint256 public epochLength = 30 days;
     uint256 private _largeDepositTimestamp;
 
     event Claimed(uint256 indexed amount);
@@ -32,11 +32,11 @@ contract BridgeInterestReceiver is Initializable {
     }
 
     /**
-     * @dev Initialize receiver, requires minimum balance to not set a dripRate of 0
+     * @dev Initialize receiver, require minimum balance to not set a dripRate of 0
      */
     function initialize() public payable initializer {
         currentEpochBalance = _aggregateBalance();
-        //  require(currentEpochBalance > 10000 ether);
+        // require(currentEpochBalance > 10000 ether);
         lastClaimTimestamp = block.timestamp;
         nextClaimEpoch = block.timestamp + epochLength;
         dripRate = currentEpochBalance / epochLength;
@@ -104,10 +104,12 @@ contract BridgeInterestReceiver is Initializable {
      */
     function _aggregateBalance() internal returns (uint256 balance) {
         uint256 xDAIbalance = address(this).balance;
+        uint256 wxdaiBalance = wxdai.balanceOf(address(this));
         if (xDAIbalance > 0) {
             wxdai.deposit{value: xDAIbalance}();
+            require((wxdai.balanceOf(address(this)) - wxdaiBalance == xDAIbalance),  "Failed wxdai deposit");              
         }
-        return wxdai.balanceOf(address(this));
+        return wxdaiBalance + xDAIbalance;
     }
 
     /**
@@ -138,4 +140,6 @@ contract BridgeInterestReceiver is Initializable {
         uint256 annualYield = (dripRate * 365 days);
         return (1 ether * annualYield) / deposits;
     }
+
+    receive() external payable{}
 }

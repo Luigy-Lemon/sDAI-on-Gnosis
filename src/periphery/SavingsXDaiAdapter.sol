@@ -71,6 +71,15 @@ contract SavingsXDaiAdapter {
         return shares;
     }
 
+    function redeemXDAI(uint256 shares, address receiver) public payable virtual returns (uint256) {
+        interestReceiver.claim();
+        uint256 assets = sDAI.redeem(shares, address(this), msg.sender);
+        wxdai.withdraw(assets);
+        (bool sent,) = receiver.call{value: assets}("");
+        require(sent, "Failed to send xDAI");
+        return assets;
+    }
+
     function redeemAll(address receiver) public virtual returns (uint256) {
         interestReceiver.claim();
         uint256 shares = sDAI.balanceOf(msg.sender);
@@ -87,7 +96,7 @@ contract SavingsXDaiAdapter {
         return assets;
     }
 
-    function vaultAPY() external returns (uint256) {
+    function vaultAPY() external view returns (uint256) {
         return interestReceiver.vaultAPY();
     }
 
