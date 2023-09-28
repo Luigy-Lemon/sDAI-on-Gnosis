@@ -44,9 +44,10 @@ contract BridgeInterestReceiver is Initializable {
         // Only start first epoch once 30.000 DAI have been bridged
         require(currentEpochBalance > 30000 ether, "Fill it up first");
         lastClaimTimestamp = block.timestamp;
-        // Set custom first epoch balance or length
-        nextClaimEpoch = block.timestamp + epochLength;
-        dripRate = currentEpochBalance / epochLength;
+        // Set custom first epoch balance or length 
+        uint256 firstClaimLength = 6 days;
+        nextClaimEpoch = block.timestamp + firstClaimLength;
+        dripRate = currentEpochBalance / firstClaimLength;
     }
 
     function claim() public isInitialized isClaimer returns (uint256 claimed) {

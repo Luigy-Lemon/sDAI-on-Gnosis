@@ -196,6 +196,11 @@ contract BridgeInterestReceiverTest is SetupTest {
         }
     }
 
+    function skipFirstEpoch() public {
+        skipTime(rcv.nextClaimEpoch() + 1);
+        claimEOA();
+    }
+
     /*//////////////////////////////////////////////////////////////
                         CONDITIONAL CHECKS
     //////////////////////////////////////////////////////////////*/
@@ -206,8 +211,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_IncreasedFromZeroBalance() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(1 hours);
         assertEq(rcv.dripRate(), rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
@@ -216,8 +222,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_endOfEpochMinus1() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(epoch - 1);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
@@ -229,8 +236,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_endOfEpoch() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(epoch);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
@@ -243,8 +251,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_endOfEpochPlus1ButNoDeposits() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(epoch + 1);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
@@ -256,8 +265,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_endOfEpochWithNewDeposits() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(epoch / 2);
         donateReceiverWXDAI();
         skipTime(epoch / 2);
@@ -272,8 +282,9 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testClaim_pastEndOfEpochWithNewDeposits() external {
-        donateReceiverWXDAI();
         setClaimerAndInitialize();
+        donateReceiverWXDAI();              
+        skipFirstEpoch();
         skipTime(epoch / 2);
         donateReceiverWXDAI();
         donateReceiverWXDAI();

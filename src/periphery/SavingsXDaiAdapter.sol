@@ -65,7 +65,8 @@ contract SavingsXDaiAdapter {
         if (assets == 0) {
             return 0;
         }
-
+        uint256 maxAssets = sDAI.maxWithdraw(msg.sender);
+        assets = (assets > maxAssets) ? maxAssets : assets;
         uint256 shares = sDAI.withdraw(assets, address(this), msg.sender);
         uint256 balance = wxdai.balanceOf(address(this));
         wxdai.withdraw(balance);

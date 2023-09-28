@@ -30,8 +30,8 @@ contract SavingsXDaiDeployer is Script {
                                 DEPLOYMENTS
         //////////////////////////////////////////////////////////////*/
 
-        SavingsXDai sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
-        console.log("Deployed sDAI on Gnosis: %s", address(sDAI));
+        SavingsXDai sDAI = new SavingsXDai("Savings xDAI", "sDAI");
+        console.log("Deployed sDAI: %s", address(sDAI));
 
         BridgeInterestReceiver interestReceiver = new BridgeInterestReceiver(address(sDAI));
         console.log("Deployed InterestReceiver: %s", address(interestReceiver));
