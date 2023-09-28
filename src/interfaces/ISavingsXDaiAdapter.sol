@@ -15,4 +15,3 @@ interface Interface {
     function withdrawXDAI(uint256 assets, address receiver) external payable returns (uint256);
     function wxdai() external view returns (address);
 }
-

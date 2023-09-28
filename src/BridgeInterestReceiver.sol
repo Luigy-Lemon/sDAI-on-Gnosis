@@ -7,27 +7,32 @@ import {IWXDAI} from "./interfaces/IWXDAI.sol";
 import {SavingsXDai} from "./SavingsXDai.sol";
 
 contract BridgeInterestReceiver is Initializable {
-    IWXDAI public immutable wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
+    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
     address public vault;
     SavingsXDai private sDAI;
+    address public claimer;
 
     uint256 public dripRate;
     uint256 public nextClaimEpoch;
     uint256 public currentEpochBalance;
     uint256 public lastClaimTimestamp;
-    uint256 private _lastClaimDeposits;
-    uint256 public epochLength = 30 days;
-    uint256 private _largeDepositTimestamp;
+    uint256 public epochLength = 3 days;
 
     event Claimed(uint256 indexed amount);
 
     constructor(address _vault) {
         vault = _vault;
         sDAI = SavingsXDai(payable(_vault));
+        claimer = msg.sender;
     }
 
     modifier isInitialized() {
         require(_getInitializedVersion() > 0, "Not Initialized");
+        _;
+    }
+
+    modifier isClaimer() {
+        require(tx.origin == msg.sender || msg.sender == claimer, "Not valid Claimer");
         _;
     }
 
@@ -36,27 +41,20 @@ contract BridgeInterestReceiver is Initializable {
      */
     function initialize() public payable initializer {
         currentEpochBalance = _aggregateBalance();
-        // require(currentEpochBalance > 10000 ether);
+        // Only start first epoch once 30.000 DAI have been bridged
+        require(currentEpochBalance > 30000 ether, "Fill it up first");
         lastClaimTimestamp = block.timestamp;
+        // Set custom first epoch balance or length
         nextClaimEpoch = block.timestamp + epochLength;
         dripRate = currentEpochBalance / epochLength;
     }
 
-    function claim() public isInitialized returns (uint256 claimed) {
-        uint256 assets = sDAI.totalAssets();
-        // If large deposit into vault index claim timestamp
-        if (assets > _lastClaimDeposits + 25000 ether) {
-            _largeDepositTimestamp = block.timestamp;
-        }
-        // Update expected size of vault assets
-        _lastClaimDeposits = assets;
-        // if already claimed in this block or if a large deposit was made, skip it.
-        if (lastClaimTimestamp == block.timestamp || _largeDepositTimestamp == block.timestamp) {
+    function claim() public isInitialized isClaimer returns (uint256 claimed) {
+        // if already claimed in this block, skip it
+        if (lastClaimTimestamp == block.timestamp) {
             return 0;
         }
-
         uint256 balance = _aggregateBalance();
-
         if (balance > 0) {
             (claimed) = _calcClaimable(balance);
             lastClaimTimestamp = block.timestamp;
@@ -86,8 +84,8 @@ contract BridgeInterestReceiver is Initializable {
         }
         // If current time is past next epoch starting time update dripRate
         if (block.timestamp > nextClaimEpoch) {
-            if ((balance - claimable) < 1 ether) {
-                // If post-claim balance too low wait for more deposits and set rate to 0
+            // If post-claim balance too low wait for more deposits and set rate to 0 (minInterest bridged used as reference)
+            if ((balance - claimable) < 1000 ether) {
                 dripRate = 0;
             } else {
                 // If post-claim balance is significant set new dripRate and start a new Epoch
@@ -107,7 +105,7 @@ contract BridgeInterestReceiver is Initializable {
         uint256 wxdaiBalance = wxdai.balanceOf(address(this));
         if (xDAIbalance > 0) {
             wxdai.deposit{value: xDAIbalance}();
-            require((wxdai.balanceOf(address(this)) - wxdaiBalance == xDAIbalance),  "Failed wxdai deposit");              
+            require((wxdai.balanceOf(address(this)) - wxdaiBalance == xDAIbalance), "Failed wxdai deposit");
         }
         return wxdaiBalance + xDAIbalance;
     }
@@ -141,5 +139,10 @@ contract BridgeInterestReceiver is Initializable {
         return (1 ether * annualYield) / deposits;
     }
 
-    receive() external payable{}
+    function setClaimer(address newClaimer) external {
+        require(claimer == msg.sender, "Not Claimer");
+        claimer = newClaimer;
+    }
+
+    receive() external payable {}
 }

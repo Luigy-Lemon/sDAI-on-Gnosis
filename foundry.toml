@@ -14,7 +14,7 @@ chiado = "${RPC_CHIADO}"
 
 [etherscan]
 #mainnet={key="${ETHERSCAN_API_KEY_MAINNET}",chainId=1}
-gnosis={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=100}
+#gnosis={key="${ETHERSCAN_API_KEY_GNOSIS}",chainId=100}
 
 [fuzz]
 runs=2000

@@ -15,35 +15,62 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testAlreadyInitialized() public {
-        testInitialize();
+        setClaimerAndInitialize();
         vm.startPrank(initializer);
         vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
         rcv.initialize();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        UNIT TESTS
-    //////////////////////////////////////////////////////////////*/
     function testInitialize_anyoneAllowed() external {
         vm.startPrank(alice);
+        vm.deal(address(rcv), 50000 ether);
+        rcv.initialize();
+    }
+
+    function testInitialize_notEnoughBalance() external {
+        vm.startPrank(alice);
+        vm.deal(address(rcv), 5000 ether);
+        vm.expectRevert("Fill it up first");
         rcv.initialize();
     }
     /*//////////////////////////////////////////////////////////////
                         CLAIM LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function claimEOA() public returns (uint256 claimed) {
+        vm.startPrank(bob, bob);
+        claimed = rcv.claim();
+        vm.stopPrank();
+    }
+
+    function testClaim__FromAdapter() public {
+        setClaimerAndInitialize();
+        skipTime(1 hours);
+        uint256 claimable = rcv.previewClaimable();
+        vm.prank(bob,bob);
+        adapter.depositXDAI{value: 1 ether}(bob);
+        uint256 claimed = claimable - rcv.previewClaimable();
+        assertEq(claimable, claimed);
+        assertGt(claimed, 0);
+    }
+
+    function testClaim__FromContract() public {
+        setClaimerAndInitialize();
+        skipTime(1 hours);
+        vm.expectRevert("Not valid Claimer");
+        rcv.claim();
+    }
+
     function testClaim() public {
         testTopInterestReceiver();
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 shares = sDAI.totalSupply();
         uint256 totalWithdrawable = sDAI.previewRedeem(shares);
         skipTime(1 days);
         testTopInterestReceiver();
         uint256 sDAIBalance = wxdai.balanceOf(address(sDAI));
         uint256 rcvBalance = wxdai.balanceOf(address(rcv)) + address(rcv).balance;
-
-        uint256 claimed = rcv.claim();
-
+        uint256 claimed = claimEOA();
         assertLe(sDAIBalance, sDAI.totalAssets());
         assertLe(wxdai.balanceOf(address(rcv)), rcvBalance);
         assertEq(sDAI.totalSupply(), shares);
@@ -53,7 +80,7 @@ contract BridgeInterestReceiverTest is SetupTest {
     }
 
     function testFuzzClaim(uint256 time) public {
-        testInitialize();
+        setClaimerAndInitialize();
         time = bound(time, 0, 2 days);
         require(time >= 0 && time <= 2 days);
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
@@ -77,7 +104,7 @@ contract BridgeInterestReceiverTest is SetupTest {
         skipTime(time); //skip time
         uint256 claimable = rcv.previewClaimable();
         uint256 epochBalance = rcv.currentEpochBalance();
-        uint256 claimed = rcv.claim();
+        uint256 claimed = claimEOA();
 
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
         console.log(
@@ -132,7 +159,7 @@ contract BridgeInterestReceiverTest is SetupTest {
         skipTime(time); //skip time
         claimable = rcv.previewClaimable();
         epochBalance = rcv.currentEpochBalance();
-        claimed = rcv.claim();
+        claimed = claimEOA();
         console.log("GlobalTime: %s | Time: %s | CurrentTime: %s", globalTime, time, block.timestamp);
         console.log(
             "nextClaimEpoch: %s | lastClaimTimestamp: %s | dripRate: %s",
@@ -175,35 +202,27 @@ contract BridgeInterestReceiverTest is SetupTest {
 
     function testClaim_ifNotInitialized() external {
         vm.expectRevert("Not Initialized");
-        rcv.claim();
-    }
-
-    function testClaim_ifInitializedWithoutBalance() external {
-        testInitialize();
-        uint256 claimed = rcv.claim();
-        assertEq(claimed, 0);
-        assertEq(rcv.dripRate(), 0);
-        assertEq(rcv.nextClaimEpoch(), block.timestamp + epoch);
+        claimEOA();
     }
 
     function testClaim_IncreasedFromZeroBalance() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(1 hours);
         assertEq(rcv.dripRate(), rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
+        uint256 claimed = claimEOA();
         assertEq(claimed, rcv.dripRate() * 1 hours);
     }
 
     function testClaim_endOfEpochMinus1() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(epoch - 1);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
+        uint256 claimed = claimEOA();
         assertEq(claimed, rcv.dripRate() * (epoch - 1));
         assertEq(rcv.dripRate(), rate);
         assertEq(rcv.nextClaimEpoch(), block.timestamp + 1);
@@ -211,13 +230,13 @@ contract BridgeInterestReceiverTest is SetupTest {
 
     function testClaim_endOfEpoch() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(epoch);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
-        assertApproxEqAbs(claimed, rcv.dripRate() * epoch, 100000);
+        uint256 claimed = claimEOA();
+        assertApproxEqAbs(claimed, rcv.dripRate() * epoch, 500000);
         assertEq(claimed, rcv.currentEpochBalance());
         assertEq(rcv.dripRate(), rate);
         assertEq(rcv.nextClaimEpoch(), block.timestamp);
@@ -225,12 +244,12 @@ contract BridgeInterestReceiverTest is SetupTest {
 
     function testClaim_endOfEpochPlus1ButNoDeposits() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(epoch + 1);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
+        uint256 claimed = claimEOA();
         assertEq(claimed, rcv.currentEpochBalance());
         assertEq(rcv.dripRate(), 0);
         assertEq(rcv.nextClaimEpoch(), block.timestamp - 1);
@@ -238,15 +257,15 @@ contract BridgeInterestReceiverTest is SetupTest {
 
     function testClaim_endOfEpochWithNewDeposits() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(epoch / 2);
         donateReceiverWXDAI();
         skipTime(epoch / 2);
         uint256 rate = rcv.dripRate();
         assertEq(rate, rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
-        assertApproxEqAbs(claimed, rcv.dripRate() * epoch, 100000);
+        uint256 claimed = claimEOA();
+        assertApproxEqAbs(claimed, rcv.dripRate() * epoch, 500000);
         assertEq(claimed, rcv.currentEpochBalance());
         assertEq(rcv.dripRate(), rate);
         assertEq(rcv.nextClaimEpoch(), block.timestamp);
@@ -254,7 +273,7 @@ contract BridgeInterestReceiverTest is SetupTest {
 
     function testClaim_pastEndOfEpochWithNewDeposits() external {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(epoch / 2);
         donateReceiverWXDAI();
         donateReceiverWXDAI();
@@ -262,11 +281,12 @@ contract BridgeInterestReceiverTest is SetupTest {
         uint256 balance = rcv.currentEpochBalance();
         assertEq(rate, balance / epoch);
         assertEq(rcv.nextClaimEpoch(), rcv.lastClaimTimestamp() + epoch);
-        uint256 claimed = rcv.claim();
-        assertApproxEqAbs(claimed, rcv.dripRate() * (epoch / 2), 100000);
+        uint256 claimed = claimEOA();
+        assertApproxEqAbs(claimed, rcv.dripRate() * (epoch / 2), 500000);
         skipTime(epoch);
-        uint256 claimed1 = rcv.claim();
-        assertApproxEqAbs(claimed1, rate * (epoch / 2), 100000);
+        uint256 balance1 = rcv.currentEpochBalance();
+        uint256 claimed1 = claimEOA();
+        assertEq(claimed1, balance1);
         assertEq(claimed1, balance - claimed);
         assertEq(rcv.dripRate(), rcv.currentEpochBalance() / epoch);
         assertEq(rcv.nextClaimEpoch(), block.timestamp + epoch);

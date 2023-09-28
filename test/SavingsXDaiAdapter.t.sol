@@ -29,7 +29,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
 
     function testDeposit() public {
         donateReceiverWXDAI();
-        testInitialize();
+        setClaimerAndInitialize();
         skipTime(1 hours);
         uint256 assets = 1e18;
         address receiver = alice;
@@ -45,11 +45,12 @@ contract SavingsXDaiAdapterTest is SetupTest {
         assertEq(sDAI.balanceOf(receiver), shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(wxdai.balanceOf(receiver), initialBalance - assets);
+        adapter.deposit(assets, address(24));
         vm.stopPrank();
     }
 
     function testFuzzDeposit(uint256 assets) public {
-        testInitialize();
+        setClaimerAndInitialize();
         address receiver = alice;
 
         uint256 initialAssets = wxdai.balanceOf(receiver);
@@ -69,7 +70,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
     }
 
     function testFuzzMint(uint256 shares) public {
-        testInitialize();
+        setClaimerAndInitialize();
         address receiver = alice;
 
         uint256 initialAssets = wxdai.balanceOf(receiver);
@@ -136,7 +137,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
     }
 
     function testDepositXDAI() public payable {
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 assets = 1e18;
         address receiver = alice;
         uint256 initialAssets = alice.balance;
@@ -155,7 +156,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
     }
 
     function testXDaiTransfer() public payable {
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 assets = 1e18;
         address receiver = alice;
         uint256 initialAssets = alice.balance;
@@ -176,7 +177,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
     }
 
     function testWithdrawXDAI(uint256 assets) public payable {
-        testInitialize();
+        setClaimerAndInitialize();
         address receiver = alice;
 
         vm.assume(assets <= sDAI.maxWithdraw(receiver));
@@ -236,7 +237,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
         vm.stopPrank();
 
         assertEq(sDAI.balanceOf(owner), 0);
-        assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
+        assertGt(sDAI.totalAssets(), sDAI.maxWithdraw(owner));
         assertEq(sDAI.maxWithdraw(owner), 0);
         assertEq(receiver.balance, initialAssets + previewAssets);
         if (shares > 0 && wxdai.balanceOf(address(sDAI)) == 0) {
@@ -249,7 +250,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
     //////////////////////////////////////////////////////////////*/
 
     function testMintAndWithdraw(uint256 shares) public {
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 initialAssets = wxdai.balanceOf(alice);
         vm.assume(shares < sDAI.convertToShares(initialAssets));
 
@@ -266,7 +267,7 @@ contract SavingsXDaiAdapterTest is SetupTest {
 
     // checks that all deposit functions from deposit, depositXDAI and mint all return the same shares given equivalent inputs.
     function test_CompareAllTypes_Deposits() public {
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 assets = 1e18;
 
         vm.startPrank(alice);
@@ -299,9 +300,11 @@ contract SavingsXDaiAdapterTest is SetupTest {
 
     // checks that all withdraw functions from withdraw, withdrawXDAI and redeem all return the same shares given equivalent inputs.
     function test_CompareAllTypes_Withdrawals() public {
-        testInitialize();
+        setClaimerAndInitialize();
         uint256 assets = 1e18;
+        vm.startPrank(alice, alice);
         rcv.claim();
+        vm.stopPrank();
         vm.startPrank(alice);
         uint256 initialShares_a = sDAI.balanceOf(alice);
         assertGt(alice.balance, assets * 3);

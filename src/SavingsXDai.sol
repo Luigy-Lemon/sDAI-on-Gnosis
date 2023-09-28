@@ -13,7 +13,7 @@ interface IERC1271 {
 }
 
 contract SavingsXDai is ERC4626, IERC20Permit, EIP712, Nonces {
-    IWXDAI public immutable wxdai = IWXDAI(0x18c8a7ec7897177E4529065a7E7B0878358B3BfF);
+    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
 
     // --- EIP712 niceties ---
     uint256 public immutable deploymentChainId;

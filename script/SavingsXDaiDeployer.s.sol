@@ -39,8 +39,8 @@ contract SavingsXDaiDeployer is Script {
         SavingsXDaiAdapter adapter = new SavingsXDaiAdapter(address(interestReceiver), payable(sDAI));
         console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
 
-        interestReceiver.initialize();
-        console.log("Initialized InterestReceiver");
+        interestReceiver.setClaimer(address(adapter));
+        console.log("Configured Claimer on receiver");
 
         vm.stopBroadcast();
     }
