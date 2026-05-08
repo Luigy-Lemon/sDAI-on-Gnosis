@@ -71,6 +71,8 @@ contract SetupTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testInitialize_revertsWhenUnderfunded() public {
+        deal(address(wxdai), address(rcv), 0);
+        vm.deal(address(rcv), 0);
         vm.startPrank(initializer);
         uint256 minB = rcv.MIN_INITIAL_BALANCE();
         vm.deal(address(rcv), minB);
@@ -84,6 +86,8 @@ contract SetupTest is Test {
     }
 
     function testInitialize_succeedsWhenFunded() public {
+        deal(address(wxdai), address(rcv), 0);
+        vm.deal(address(rcv), 0);
         vm.startPrank(initializer);
         uint256 minB = rcv.MIN_INITIAL_BALANCE();
         vm.deal(address(rcv), minB + 1 wei);

@@ -10,6 +10,11 @@ contract DeployScriptsTest is Test {
         vm.createSelectFork("gnosis");
     }
 
+    /// @dev Key path coverage: `testDeployReceiverAdapter` / `testSavingsXDaiDeployer` use the
+    ///      long BIP-39 test mnemonic (>30 chars) so `vm.deriveKey` runs; `_WithPrivateKey` tests
+    ///      use `MNEMONIC=short` and `PRIVATE_KEY`. `forge coverage` often reports `deriveKey` as
+    ///      zero hits on the assignment line (cheatcode), even when that branch executes.
+
     function testDeployReceiverAdapter() public {
         vm.setEnv("SDAI_ADDRESS", "0x0000000000000000000000000000000000000001");
         vm.setEnv("MNEMONIC", "test test test test test test test test test test test junk");

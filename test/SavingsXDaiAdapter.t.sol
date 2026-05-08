@@ -5,13 +5,13 @@ import "forge-std/Test.sol";
 import "./Setup.t.sol";
 import {ISavingsXDaiAdapter} from "src/interfaces/ISavingsXDaiAdapter.sol";
 
-contract RevertOnReceive {
-    receive() external payable {
-        revert();
-    }
-}
-
 contract SavingsXDaiAdapterTest is SetupTest {
+    /// @dev When true, native xDAI sent to this test contract reverts (see testSendNative_Revert).
+    bool internal rejectNativeReceive;
+
+    receive() external payable {
+        if (rejectNativeReceive) revert();
+    }
     function testMetadata() public view {
         assertEq(adapter.sDAI(), address(sDAI));
         assertEq(address(sDAI.wxdai()), address(wxdai));
@@ -443,10 +443,11 @@ contract SavingsXDaiAdapterTest is SetupTest {
         setClaimerAndInitialize();
         vm.startPrank(alice);
         uint256 shares = adapter.depositXDAI{value: 1e18}(alice);
-        RevertOnReceive revertingReceiver = new RevertOnReceive();
         sDAI.approve(address(adapter), shares);
+        rejectNativeReceive = true;
         vm.expectRevert(ISavingsXDaiAdapter.XDaiSendFailed.selector);
-        adapter.redeemXDAI(shares, address(revertingReceiver));
+        adapter.redeemXDAI(shares, address(this));
+        rejectNativeReceive = false;
         vm.stopPrank();
     }
 }
