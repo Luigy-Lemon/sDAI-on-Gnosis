@@ -30,11 +30,12 @@ contract DeployReceiverAdapter is Script {
         SavingsXDaiAdapter adapter = new SavingsXDaiAdapter(address(interestReceiver), payable(sDAI));
         console.log("Deployed SavingsXDaiAdapter: %s", address(adapter));
 
-        // Seed strictly above MIN_INITIAL_BALANCE (1 ether); exactly 1 ether still reverts initialize.
-        payable(address(interestReceiver)).transfer(2 ether);
-        console.log("Transferred 2 XDAI to InterestReceiver");
+        // Seed at least MIN_INITIAL_BALANCE (1 ether) native; initialize reverts only if
+        // `_aggregateBalance() < MIN_INITIAL_BALANCE`.
+        payable(address(interestReceiver)).transfer(1 ether);
+        console.log("Transferred 1 XDAI to InterestReceiver");
 
-        // Attempt initialization — requires interestReceiver balance >= MIN_INITIAL_BALANCE
+        // Attempt initialization (succeeds when aggregate balance is not strictly below MIN)
         try interestReceiver.initialize(address(adapter)) {
             console.log("InterestReceiver initialized with claimer: %s", address(adapter));
         } catch {

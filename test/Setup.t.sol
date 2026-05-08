@@ -75,10 +75,10 @@ contract SetupTest is Test {
         vm.deal(address(rcv), 0);
         vm.startPrank(initializer);
         uint256 minB = rcv.MIN_INITIAL_BALANCE();
-        vm.deal(address(rcv), minB);
+        vm.deal(address(rcv), minB - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBridgeInterestReceiver.InsufficientInitialBalance.selector, minB, minB
+                IBridgeInterestReceiver.InsufficientInitialBalance.selector, minB - 1, minB
             )
         );
         rcv.initialize(address(adapter));
@@ -90,7 +90,7 @@ contract SetupTest is Test {
         vm.deal(address(rcv), 0);
         vm.startPrank(initializer);
         uint256 minB = rcv.MIN_INITIAL_BALANCE();
-        vm.deal(address(rcv), minB + 1 wei);
+        vm.deal(address(rcv), minB);
         rcv.initialize(address(adapter));
         vm.stopPrank();
         assertEq(rcv.claimer(), address(adapter));
@@ -98,7 +98,7 @@ contract SetupTest is Test {
 
     function setClaimerAndInitialize() public {
         vm.startPrank(initializer);
-        vm.deal(address(rcv), rcv.MIN_INITIAL_BALANCE() + 1 ether);
+        vm.deal(address(rcv), rcv.MIN_INITIAL_BALANCE());
         rcv.initialize(address(adapter));
         vm.stopPrank();
     }

@@ -97,7 +97,7 @@ contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
         claimer = _claimer;
 
         currentEpochBalance = _aggregateBalance();
-        if (currentEpochBalance <= MIN_INITIAL_BALANCE) {
+        if (currentEpochBalance < MIN_INITIAL_BALANCE) {
             revert InsufficientInitialBalance(currentEpochBalance, MIN_INITIAL_BALANCE);
         }
         lastClaimTimestamp = block.timestamp;

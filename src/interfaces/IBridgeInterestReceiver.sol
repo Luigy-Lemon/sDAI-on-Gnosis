@@ -111,6 +111,8 @@ interface IBridgeInterestReceiver {
     ///         cannot hijack the role once funding crosses the threshold; a hijack would
     ///         not steal funds (claim() always sends to `vault`), but would brick the
     ///         adapter, whose `claim()` modifier requires the adapter to BE the claimer.
+    ///         Reverts {InsufficientInitialBalance} when native + WXDAI aggregate (after
+    ///         wrapping) is **strictly below** {MIN_INITIAL_BALANCE}; equality is allowed.
     /// @param _claimer Operational claimer (typically the SavingsXDaiAdapter).
     function initialize(address _claimer) external payable;
 
