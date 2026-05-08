@@ -1,149 +1,231 @@
 // SPDX-License-Identifier: agpl-3
 pragma solidity ^0.8.19;
 
-import "openzeppelin/interfaces/IERC4626.sol";
 import "openzeppelin/proxy/utils/Initializable.sol";
+import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
+import {IBridgeInterestReceiver} from "./interfaces/IBridgeInterestReceiver.sol";
 import {SavingsXDai} from "./SavingsXDai.sol";
 
-contract BridgeInterestReceiver is Initializable {
+/// @title BridgeInterestReceiver
+/// @notice See {IBridgeInterestReceiver}.
+contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
+    using SafeERC20 for IERC20;
+
+    /*//////////////////////////////////////////////////////////////
+                                CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public constant DRIP_PAUSE_THRESHOLD = 100 ether;
+
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public constant MIN_INITIAL_BALANCE = 1 ether;
+
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public constant EPOCH_LENGTH = 3 days;
+
+    /*//////////////////////////////////////////////////////////////
+                               IMMUTABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
     IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
-    address public vault;
-    SavingsXDai private sDAI;
+
+    /// @inheritdoc IBridgeInterestReceiver
+    address public immutable vault;
+
+    /// @dev Typed handle to {vault}; kept private because callers can read {vault} directly.
+    SavingsXDai private immutable sDAI;
+
+    /*//////////////////////////////////////////////////////////////
+                                 STORAGE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
     address public claimer;
 
+    /// @inheritdoc IBridgeInterestReceiver
     uint256 public dripRate;
-    uint256 public nextClaimEpoch;
-    uint256 public currentEpochBalance;
-    uint256 public lastClaimTimestamp;
-    uint256 public epochLength = 3 days;
 
-    event Claimed(uint256 indexed amount);
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public nextClaimEpoch;
+
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public currentEpochBalance;
+
+    /// @inheritdoc IBridgeInterestReceiver
+    uint256 public lastClaimTimestamp;
+
+    /*//////////////////////////////////////////////////////////////
+                              CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     constructor(address _vault) {
         vault = _vault;
         sDAI = SavingsXDai(payable(_vault));
         claimer = msg.sender;
+        emit ClaimerChanged(address(0), msg.sender);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
     modifier isInitialized() {
-        require(_getInitializedVersion() > 0, "Not Initialized");
+        if (_getInitializedVersion() == 0) revert NotInitialized();
         _;
     }
 
     modifier isClaimer() {
-        require(tx.origin == msg.sender || msg.sender == claimer, "Not valid Claimer");
+        if (msg.sender.code.length != 0 && msg.sender != claimer) revert InvalidSender();
         _;
     }
 
-    /**
-     * @dev Initialize receiver, require minimum balance to not set a dripRate of 0
-     */
-    function initialize() public payable initializer {
+    /*//////////////////////////////////////////////////////////////
+                                  ADMIN
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
+    function initialize(address _claimer) external payable initializer {
+        if (msg.sender != claimer) revert InvalidSender();
+        if (_claimer == address(0)) revert InvalidClaimer();
+
+        address oldClaimer = claimer;
+        claimer = _claimer;
+
         currentEpochBalance = _aggregateBalance();
-        // Only start first epoch once 30.000 DAI have been bridged
-        require(currentEpochBalance > 30000 ether, "Fill it up first");
+        if (currentEpochBalance <= MIN_INITIAL_BALANCE) {
+            revert InsufficientInitialBalance(currentEpochBalance, MIN_INITIAL_BALANCE);
+        }
         lastClaimTimestamp = block.timestamp;
-        // Set custom first epoch balance or length 
-        uint256 firstClaimLength = 6 days;
-        nextClaimEpoch = block.timestamp + firstClaimLength;
-        dripRate = currentEpochBalance / firstClaimLength;
+        nextClaimEpoch = block.timestamp + EPOCH_LENGTH;
+        dripRate = currentEpochBalance / EPOCH_LENGTH;
+
+        emit ClaimerChanged(oldClaimer, _claimer);
+        emit ReceiverInitialized(currentEpochBalance, dripRate, nextClaimEpoch);
     }
 
-    function claim() public isInitialized isClaimer returns (uint256 claimed) {
-        // if already claimed in this block, skip it
+    /*//////////////////////////////////////////////////////////////
+                                MUTATIVE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
+    function claim() external isInitialized isClaimer returns (uint256 claimed) {
         if (lastClaimTimestamp == block.timestamp) {
             return 0;
         }
         uint256 balance = _aggregateBalance();
         if (balance > 0) {
-            (claimed) = _calcClaimable(balance);
+            claimed = _settleClaim(balance);
             lastClaimTimestamp = block.timestamp;
 
-            wxdai.transfer(vault, claimed);
-            emit Claimed(claimed);
+            IERC20(address(wxdai)).safeTransfer(vault, claimed);
+            emit Claimed(vault, claimed);
         }
-        return claimed;
     }
 
-    function _calcClaimable(uint256 balance) internal returns (uint256 claimable) {
-        uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
+    receive() external payable {}
 
-        // If a full epoch has passed since last claim, claim the full balance
-        if (unclaimedTime >= epochLength) {
-            claimable = currentEpochBalance;
+    /*//////////////////////////////////////////////////////////////
+                                  VIEW
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IBridgeInterestReceiver
+    function previewClaimable() external view returns (uint256) {
+        return _computeClaimable(
+            block.timestamp, lastClaimTimestamp, currentEpochBalance, dripRate, EPOCH_LENGTH
+        );
+    }
+
+    /// @inheritdoc IBridgeInterestReceiver
+    function vaultAPY() external view returns (uint256) {
+        uint256 deposits = sDAI.totalAssets();
+        if (deposits == 0) return 0;
+        return (1 ether * dripRate * 365 days) / deposits;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                INTERNAL
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Pure read: how much is claimable now given the current epoch state.
+    function _computeClaimable(
+        uint256 timestamp,
+        uint256 _lastClaimTimestamp,
+        uint256 _currentEpochBalance,
+        uint256 _dripRate,
+        uint256 _epochLength
+    ) internal pure returns (uint256 claimable) {
+        uint256 unclaimedTime = timestamp - _lastClaimTimestamp;
+        if (unclaimedTime >= _epochLength) {
+            claimable = _currentEpochBalance;
         } else {
-            // otherwise release the amount dripped during that time
-            claimable = unclaimedTime * dripRate;
-            // update how much has already been claimed this epoch
-            if (currentEpochBalance < claimable) {
-                claimable = currentEpochBalance;
-                currentEpochBalance = 0;
-            } else {
-                currentEpochBalance -= claimable;
+            claimable = unclaimedTime * _dripRate;
+            if (_currentEpochBalance < claimable) {
+                claimable = _currentEpochBalance;
             }
         }
-        // If current time is past next epoch starting time update dripRate
-        if (block.timestamp > nextClaimEpoch) {
-            // If post-claim balance too low wait for more deposits and set rate to 0 (minInterest bridged used as reference)
-            if ((balance - claimable) < 1000 ether) {
-                dripRate = 0;
-            } else {
-                // If post-claim balance is significant set new dripRate and start a new Epoch
-                dripRate = (balance - claimable) / epochLength;
-                currentEpochBalance = balance - claimable;
-                nextClaimEpoch = block.timestamp + epochLength;
-            }
-        }
-        return claimable;
     }
 
-    /**
-     * @dev Convert xDAI into wxdai and return the balanceOf this contract
-     */
-    function _aggregateBalance() internal returns (uint256 balance) {
+    /// @dev Pure rollover: returns `(newDripRate, newEpochBalance)` for the next epoch, or
+    ///      `(0, 0)` if the post-claim balance is below {DRIP_PAUSE_THRESHOLD} (drip pauses)
+    ///      or if no rollover should happen yet.
+    function _computeNextEpochState(
+        uint256 timestamp,
+        uint256 balance,
+        uint256 claimable,
+        uint256 _nextClaimEpoch,
+        uint256 _epochLength
+    ) internal pure returns (uint256 newDrip, uint256 newEpochBal) {
+        if (timestamp > _nextClaimEpoch) {
+            uint256 postClaim = balance - claimable;
+            if (postClaim < DRIP_PAUSE_THRESHOLD) return (0, 0);
+            return (postClaim / _epochLength, postClaim);
+        }
+    }
+
+    /// @dev Stateful: returns the claimable amount and advances epoch state (subtract within
+    ///      epoch, roll over / pause across boundaries). Caller is responsible for transferring
+    ///      `claimable` and updating `lastClaimTimestamp`.
+    function _settleClaim(uint256 balance) internal returns (uint256 claimable) {
+        claimable = _computeClaimable(
+            block.timestamp, lastClaimTimestamp, currentEpochBalance, dripRate, EPOCH_LENGTH
+        );
+
+        uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
+        if (unclaimedTime < EPOCH_LENGTH) {
+            // Safe: _computeClaimable caps `claimable` at `currentEpochBalance`.
+            currentEpochBalance -= claimable;
+        }
+
+        if (block.timestamp > nextClaimEpoch) {
+            (uint256 newDrip, uint256 newEpochBal) = _computeNextEpochState(
+                block.timestamp, balance, claimable, nextClaimEpoch, EPOCH_LENGTH
+            );
+            // Always rewrite epoch state on rollover, otherwise a sub-threshold pause leaves
+            // `currentEpochBalance` stale and bricks future claims (insufficient wxDAI balance).
+            dripRate = newDrip;
+            currentEpochBalance = newEpochBal;
+            nextClaimEpoch = block.timestamp + EPOCH_LENGTH;
+
+            if (newEpochBal > 0) {
+                emit EpochRolled(newDrip, newEpochBal, nextClaimEpoch);
+            } else {
+                emit DripPaused(balance - claimable);
+            }
+        }
+    }
+
+    /// @dev Wraps any native xDAI held by this contract into WXDAI and returns the total
+    ///      WXDAI balance afterwards. WXDAI on Gnosis is non-upgradable and mints 1:1.
+    function _aggregateBalance() internal returns (uint256) {
         uint256 xDAIbalance = address(this).balance;
         uint256 wxdaiBalance = wxdai.balanceOf(address(this));
         if (xDAIbalance > 0) {
             wxdai.deposit{value: xDAIbalance}();
-            require((wxdai.balanceOf(address(this)) - wxdaiBalance == xDAIbalance), "Failed wxdai deposit");
         }
         return wxdaiBalance + xDAIbalance;
     }
-
-    /**
-     * @dev Emulates how much would be claimable given receiver address
-     */
-    function previewClaimable() external view returns (uint256 claimable) {
-        uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
-        // If a full epoch has passed since last claim, claim the full amount
-        if (unclaimedTime >= epochLength) {
-            claimable = currentEpochBalance;
-        } else {
-            // otherwise release the amount dripped during that time
-            claimable = unclaimedTime * dripRate;
-            // update how much has already been claimed this epoch
-            if (currentEpochBalance < claimable) {
-                claimable = currentEpochBalance;
-            }
-        }
-        return claimable;
-    }
-
-    /**
-     * @dev Informs about approximate sDAI vault APY based on incoming bridged interest and vault deposits
-     * @return amount of interest collected per year divided by amount of current deposits in vault
-     */
-    function vaultAPY() external view returns (uint256) {
-        uint256 deposits = sDAI.totalAssets();
-        uint256 annualYield = (dripRate * 365 days);
-        return (1 ether * annualYield) / deposits;
-    }
-
-    function setClaimer(address newClaimer) external {
-        require(claimer == msg.sender, "Not Claimer");
-        claimer = newClaimer;
-    }
-
-    receive() external payable {}
 }

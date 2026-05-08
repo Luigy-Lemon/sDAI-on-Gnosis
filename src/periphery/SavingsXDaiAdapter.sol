@@ -1,109 +1,160 @@
 // SPDX-License-Identifier: agpl-3
 pragma solidity ^0.8.19;
 
-import "../interfaces/IBridgeInterestReceiver.sol";
+import {IBridgeInterestReceiver} from "../interfaces/IBridgeInterestReceiver.sol";
+import {ISavingsXDaiAdapter} from "../interfaces/ISavingsXDaiAdapter.sol";
 import {IWXDAI} from "../interfaces/IWXDAI.sol";
 import {SavingsXDai} from "../SavingsXDai.sol";
 
-contract SavingsXDaiAdapter {
+/// @title SavingsXDaiAdapter
+/// @notice See {ISavingsXDaiAdapter}.
+contract SavingsXDaiAdapter is ISavingsXDaiAdapter {
+    /*//////////////////////////////////////////////////////////////
+                               IMMUTABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ISavingsXDaiAdapter
     IBridgeInterestReceiver public immutable interestReceiver;
-    SavingsXDai public immutable sDAI;
+
+    /// @inheritdoc ISavingsXDaiAdapter
+    address public immutable sDAI;
+
+    /// @dev Typed handle to {sDAI}; kept private because external readers can use {sDAI}.
+    SavingsXDai private immutable _sDAI;
+
+    /// @inheritdoc ISavingsXDaiAdapter
     IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
 
-    /**
-     * @dev Set the underlying asset contract. This must be an ERC20-compatible contract (ERC20 or ERC777).
-     */
+    /*//////////////////////////////////////////////////////////////
+                              CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
     constructor(address interestReceiver_, address payable sDAI_) {
         interestReceiver = IBridgeInterestReceiver(interestReceiver_);
-        sDAI = SavingsXDai(sDAI_);
+        sDAI = sDAI_;
+        _sDAI = SavingsXDai(sDAI_);
         wxdai.approve(sDAI_, type(uint256).max);
     }
 
-    // only EOAs are able to claim interest.
-    modifier claim() {
-        if (msg.sender == tx.origin) {
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Trigger an upstream {IBridgeInterestReceiver.claim} only when the call
+    ///      originates from an EOA so depositors do not trade against stale assets;
+    ///      contract callers are not blocked.
+    modifier pullInterestIfEoa() {
+        if (msg.sender.code.length == 0) {
             interestReceiver.claim();
         }
         _;
     }
 
-    function deposit(uint256 assets, address receiver) public claim() returns (uint256) {
+    /*//////////////////////////////////////////////////////////////
+                          MUTATIVE -- WXDAI PATH
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ISavingsXDaiAdapter
+    function deposit(uint256 assets, address receiver) public pullInterestIfEoa returns (uint256) {
         wxdai.transferFrom(msg.sender, address(this), assets);
-        uint256 shares = sDAI.deposit(assets, receiver);
-        return shares;
+        return _sDAI.deposit(assets, receiver);
     }
 
-    function mint(uint256 shares, address receiver) public claim() returns (uint256) {
-        wxdai.transferFrom(msg.sender, address(this), sDAI.convertToAssets(shares));
-        uint256 assets = sDAI.mint(shares, receiver);
-        return assets;
+    /// @inheritdoc ISavingsXDaiAdapter
+    function mint(uint256 shares, address receiver) public pullInterestIfEoa returns (uint256) {
+        wxdai.transferFrom(msg.sender, address(this), _sDAI.convertToAssets(shares));
+        return _sDAI.mint(shares, receiver);
     }
 
-    function withdraw(uint256 assets, address receiver) public claim() returns (uint256) {
-        uint256 maxAssets = sDAI.maxWithdraw(msg.sender);
+    /// @inheritdoc ISavingsXDaiAdapter
+    function withdraw(uint256 assets, address receiver) public pullInterestIfEoa returns (uint256) {
+        uint256 maxAssets = _sDAI.maxWithdraw(msg.sender);
         assets = (assets > maxAssets) ? maxAssets : assets;
-        return sDAI.withdraw(assets, receiver, msg.sender);
+        return _sDAI.withdraw(assets, receiver, msg.sender);
     }
 
-    function redeem(uint256 shares, address receiver) public claim() returns (uint256) {
-        uint256 maxShares = sDAI.maxRedeem(msg.sender);
+    /// @inheritdoc ISavingsXDaiAdapter
+    function redeem(uint256 shares, address receiver) public pullInterestIfEoa returns (uint256) {
+        uint256 maxShares = _sDAI.maxRedeem(msg.sender);
         shares = (shares > maxShares) ? maxShares : shares;
-        return sDAI.redeem(shares, receiver, msg.sender);
+        return _sDAI.redeem(shares, receiver, msg.sender);
     }
 
-    function depositXDAI(address receiver) public payable claim() returns (uint256) {
+    /// @inheritdoc ISavingsXDaiAdapter
+    function redeemAll(address receiver) public pullInterestIfEoa returns (uint256) {
+        uint256 shares = _sDAI.balanceOf(msg.sender);
+        return _sDAI.redeem(shares, receiver, msg.sender);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       MUTATIVE -- NATIVE xDAI PATH
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ISavingsXDaiAdapter
+    function depositXDAI(address receiver) public payable pullInterestIfEoa returns (uint256) {
         uint256 assets = msg.value;
         if (assets == 0) {
             return 0;
         }
         wxdai.deposit{value: assets}();
-        uint256 shares = sDAI.deposit(assets, receiver);
-        return shares;
+        return _sDAI.deposit(assets, receiver);
     }
 
+    /// @inheritdoc ISavingsXDaiAdapter
     function withdrawXDAI(uint256 assets, address receiver) public payable returns (uint256) {
         if (assets == 0) {
             return 0;
         }
-        uint256 maxAssets = sDAI.maxWithdraw(msg.sender);
+        uint256 maxAssets = _sDAI.maxWithdraw(msg.sender);
         assets = (assets > maxAssets) ? maxAssets : assets;
-        uint256 shares = sDAI.withdraw(assets, address(this), msg.sender);
+        uint256 shares = _sDAI.withdraw(assets, address(this), msg.sender);
         uint256 balance = wxdai.balanceOf(address(this));
         wxdai.withdraw(balance);
-        (bool sent,) = receiver.call{value: balance}("");
-        require(sent, "Failed to send xDAI");
+        _sendNative(receiver, balance);
         return shares;
     }
 
+    /// @inheritdoc ISavingsXDaiAdapter
     function redeemXDAI(uint256 shares, address receiver) public payable returns (uint256) {
-        uint256 assets = sDAI.redeem(shares, address(this), msg.sender);
+        uint256 assets = _sDAI.redeem(shares, address(this), msg.sender);
         wxdai.withdraw(assets);
-        (bool sent,) = receiver.call{value: assets}("");
-        require(sent, "Failed to send xDAI");
+        _sendNative(receiver, assets);
         return assets;
     }
 
-    function redeemAll(address receiver) public claim() returns (uint256) {
-        uint256 shares = sDAI.balanceOf(msg.sender);
-        return sDAI.redeem(shares, receiver, msg.sender);
-    }
-
+    /// @inheritdoc ISavingsXDaiAdapter
     function redeemAllXDAI(address receiver) public payable returns (uint256) {
-        uint256 shares = sDAI.balanceOf(msg.sender);
-        uint256 assets = sDAI.redeem(shares, address(this), msg.sender);
+        uint256 shares = _sDAI.balanceOf(msg.sender);
+        uint256 assets = _sDAI.redeem(shares, address(this), msg.sender);
         wxdai.withdraw(assets);
-        (bool sent,) = receiver.call{value: assets}("");
-        require(sent, "Failed to send xDAI");
+        _sendNative(receiver, assets);
         return assets;
     }
 
-    function vaultAPY() external view returns (uint256) {
-        return interestReceiver.vaultAPY();
-    }
-
+    /// @notice Auto-deposit native xDAI sent to this contract, except WXDAI unwrap refunds.
     receive() external payable {
         if (msg.sender != address(wxdai)) {
             depositXDAI(msg.sender);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                  VIEW
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ISavingsXDaiAdapter
+    function vaultAPY() external view returns (uint256) {
+        return interestReceiver.vaultAPY();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                INTERNAL
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Forwards `amount` of native xDAI to `to` via `call` and reverts with
+    ///      {XDaiSendFailed} on failure.
+    function _sendNative(address to, uint256 amount) internal {
+        (bool sent,) = to.call{value: amount}("");
+        if (!sent) revert XDaiSendFailed();
     }
 }
