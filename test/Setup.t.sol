@@ -4,26 +4,33 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {SavingsXDai} from "src/SavingsXDai.sol";
+import {ISavingsXDai} from "src/interfaces/ISavingsXDai.sol";
 import {BridgeInterestReceiver} from "src/BridgeInterestReceiver.sol";
+import {IBridgeInterestReceiver} from "src/interfaces/IBridgeInterestReceiver.sol";
 import {IWXDAI} from "src/interfaces/IWXDAI.sol";
 import "src/periphery/SavingsXDaiAdapter.sol";
 
 contract SetupTest is Test {
-    address public initializer = address(18);
-    address public alice = address(16);
-    address public bob = address(17);
+    address public initializer = makeAddr("initializer");
+    address public alice = makeAddr("alice");
+    address public bob = makeAddr("bob");
     BridgeInterestReceiver public rcv;
     SavingsXDai public sDAI;
     SavingsXDaiAdapter public adapter;
-    IWXDAI public wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public wxdai;
     uint256 public globalTime;
     uint256 public epoch;
 
     function setUp() public payable {
+        vm.createSelectFork("gnosis");
+
+        wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
         vm.deal(address(this), 100 ether);
         vm.deal(initializer, 100 ether);
         vm.deal(alice, 10000 ether);
+        vm.etch(alice, ""); // clear any code at address on forked network
         vm.deal(bob, 100000 ether);
+        vm.etch(bob, ""); // clear any code at address on forked network
         vm.startPrank(initializer);
 
         /*//////////////////////////////////////////////////////////////
@@ -49,7 +56,7 @@ contract SetupTest is Test {
         deal(address(wxdai), bob, 10000e18);
         assertEq(wxdai.balanceOf(bob), 10000e18);
         globalTime = block.timestamp;
-        epoch = rcv.epochLength();
+        epoch = rcv.EPOCH_LENGTH();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -58,33 +65,26 @@ contract SetupTest is Test {
 
     function testInitialize() public {
         vm.startPrank(initializer);
-        if (address(rcv).balance > 30000 ether) {
-            rcv.initialize();
+        uint256 minBalance = rcv.MIN_INITIAL_BALANCE();
+        if (address(rcv).balance > minBalance) {
+            rcv.initialize(address(adapter));
         } else {
-            vm.expectRevert("Fill it up first");
-            rcv.initialize();
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IBridgeInterestReceiver.InsufficientInitialBalance.selector,
+                    address(rcv).balance,
+                    minBalance
+                )
+            );
+            rcv.initialize(address(adapter));
         }
-        vm.stopPrank();
-    }
-
-    function testSetClaimer() public {
-        assertEq(rcv.claimer(), initializer);
-        vm.startPrank(initializer);
-        rcv.setClaimer(address(adapter));
-        console.log("Claimer configured: %s", address(adapter));
-        vm.stopPrank();
-        assertEq(rcv.claimer(), address(adapter));
-        vm.startPrank(initializer);
-        vm.expectRevert("Not Claimer");
-        rcv.setClaimer(bob);
         vm.stopPrank();
     }
 
     function setClaimerAndInitialize() public {
         vm.startPrank(initializer);
-        rcv.setClaimer(address(adapter));
-        vm.deal(address(rcv), 30001 ether);
-        rcv.initialize();
+        vm.deal(address(rcv), rcv.MIN_INITIAL_BALANCE() + 1 ether);
+        rcv.initialize(address(adapter));
         vm.stopPrank();
     }
 
@@ -123,22 +123,17 @@ contract SetupTest is Test {
         uint256 value = 1e16;
         address payable _to = payable(sDAI);
         bool sent;
-        vm.expectRevert(bytes("No xDAI deposits"));
+        vm.expectRevert(ISavingsXDai.NoXDaiDeposits.selector);
         (sent) = _to.send(value);
-        vm.expectRevert(bytes("No xDAI deposits"));
+        vm.expectRevert(ISavingsXDai.NoXDaiDeposits.selector);
         (sent,) = _to.call{value: value}("");
-        vm.expectRevert(bytes("No xDAI deposits"));
+        vm.expectRevert(ISavingsXDai.NoXDaiDeposits.selector);
         _to.transfer(value);
     }
 
     /*//////////////////////////////////////////////////////////////
                         UTILS
     //////////////////////////////////////////////////////////////*/
-
-    function teleport(uint256 _timestamp) public {
-        globalTime = _timestamp;
-        vm.warp(globalTime);
-    }
 
     function skipTime(uint256 secs) public {
         globalTime += secs;

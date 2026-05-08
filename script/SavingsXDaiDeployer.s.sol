@@ -39,8 +39,16 @@ contract SavingsXDaiDeployer is Script {
         SavingsXDaiAdapter adapter = new SavingsXDaiAdapter(address(interestReceiver), payable(sDAI));
         console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
 
-        interestReceiver.setClaimer(address(adapter));
-        console.log("Configured Claimer on receiver");
+        // Seed interestReceiver with initial XDAI (MIN_INITIAL_BALANCE = 1 ether)
+        payable(address(interestReceiver)).transfer(1 ether);
+        console.log("Transferred 1 XDAI to InterestReceiver");
+
+        // Attempt initialization — requires interestReceiver balance >= MIN_INITIAL_BALANCE
+        try interestReceiver.initialize(address(adapter)) {
+            console.log("InterestReceiver initialized with claimer: %s", address(adapter));
+        } catch {
+            console.log("InterestReceiver not initialized: fund with >= 1 XDAI then call initialize(%s)", address(adapter));
+        }
 
         vm.stopBroadcast();
     }

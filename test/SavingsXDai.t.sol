@@ -2,18 +2,13 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import "./Setup.t.sol";
 import "./Mocks/MockMultisig.sol";
 
 contract SavingsXDaiTest is SetupTest {
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    bytes32 constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
-    function testMetadata() public {
-        assertEq(address(rcv), address(rcv));
+    function testMetadata() public view {
+        assertEq(address(sDAI.asset()), address(wxdai));
         assertEq(address(sDAI.wxdai()), address(wxdai));
     }
 
@@ -33,7 +28,7 @@ contract SavingsXDaiTest is SetupTest {
         uint256 initialBalance_b = sDAI.balanceOf(bob);
 
         vm.expectEmit();
-        emit Transfer(sender, bob, shares);
+        emit IERC20.Transfer(sender, bob, shares);
         sDAI.transfer(bob, shares);
 
         assertEq(sDAI.balanceOf(sender), initialBalance_a - shares);
@@ -49,12 +44,8 @@ contract SavingsXDaiTest is SetupTest {
         uint256 initialShares = sDAI.balanceOf(receiver);
         wxdai.approve(address(sDAI), initialBalance);
         vm.expectEmit();
-        emit Transfer(address(0), receiver, sDAI.previewDeposit(assets));
+        emit IERC20.Transfer(address(0), receiver, sDAI.previewDeposit(assets));
         uint256 shares = sDAI.deposit(assets, receiver);
-        console.log("totalAssets: %e", sDAI.totalAssets());
-        console.log("previewDeposit: %e", sDAI.previewDeposit(assets));
-        console.log("previewRedeem: %e", sDAI.previewRedeem(sDAI.balanceOf(receiver)));
-        console.log("maxWithdraw: %e", sDAI.maxWithdraw(receiver));
         assertEq(sDAI.balanceOf(receiver), shares + initialShares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(wxdai.balanceOf(receiver), initialBalance - assets);
@@ -91,7 +82,7 @@ contract SavingsXDaiTest is SetupTest {
         vm.startPrank(alice);
         wxdai.approve(address(sDAI), initialAssets);
         vm.expectEmit();
-        emit Transfer(address(0), receiver, shares);
+        emit IERC20.Transfer(address(0), receiver, shares);
         uint256 assets = sDAI.mint(shares, receiver);
 
         assertEq(sDAI.balanceOf(receiver), initialShares + shares);
@@ -115,7 +106,7 @@ contract SavingsXDaiTest is SetupTest {
         uint256 initialShares = sDAI.balanceOf(owner);
 
         vm.expectEmit();
-        emit Transfer(receiver, address(0), sDAI.previewWithdraw(assets));
+        emit IERC20.Transfer(receiver, address(0), sDAI.previewWithdraw(assets));
         uint256 shares = sDAI.withdraw(assets, receiver, owner);
 
         assertEq(sDAI.balanceOf(owner), initialShares - shares);
@@ -138,9 +129,8 @@ contract SavingsXDaiTest is SetupTest {
 
         vm.startPrank(alice);
         vm.expectEmit();
-        emit Transfer(receiver, address(0), shares);
+        emit IERC20.Transfer(receiver, address(0), shares);
         uint256 assets = sDAI.redeem(shares, receiver, owner);
-        console.log("assets: %e %e", initialAssets, assets);
         assertEq(sDAI.balanceOf(owner), initialShares - shares);
         assertGe(sDAI.totalAssets(), sDAI.maxWithdraw(receiver));
         assertEq(wxdai.balanceOf(receiver), initialAssets + assets);
@@ -235,7 +225,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), owner, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -260,7 +250,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -271,7 +261,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -298,7 +288,7 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
@@ -309,14 +299,41 @@ contract SavingsXDaiTest is SetupTest {
                 abi.encodePacked(
                     "\x19\x01",
                     sDAI.DOMAIN_SEPARATOR(),
-                    keccak256(abi.encode(PERMIT_TYPEHASH, mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), mockMultisig, address(0xCAFE), 1e18, 0, block.timestamp))
                 )
             )
         );
 
         bytes memory signature = abi.encode(r, s, bytes32(uint256(v) << 248), r2, s2, bytes32(uint256(v2) << 248));
 
-        vm.expectRevert("SavingsXDai/invalid-permit");
+        vm.expectRevert(
+            abi.encodeWithSelector(ISavingsXDai.ERC2612InvalidSigner.selector, address(0), mockMultisig)
+        );
         sDAI.permit(mockMultisig, address(0xCAFE), 1e18, block.timestamp, signature);
+    }
+
+    function testPermit_RevertExpiredDeadline() public {
+        uint256 privateKey = 0xBEEF;
+        address owner = vm.addr(privateKey);
+        uint256 deadline = block.timestamp - 1;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    sDAI.DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(sDAI.PERMIT_TYPEHASH(), owner, address(0xCAFE), 1e18, 0, deadline))
+                )
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ISavingsXDai.ERC2612ExpiredSignature.selector, deadline));
+        sDAI.permit(owner, address(0xCAFE), 1e18, deadline, v, r, s);
+    }
+
+    function testPermit_RevertZeroOwner() public {
+        vm.expectRevert(abi.encodeWithSelector(ISavingsXDai.InvalidOwner.selector));
+        sDAI.permit(address(0), address(0xCAFE), 1e18, block.timestamp, bytes(""));
     }
 }
