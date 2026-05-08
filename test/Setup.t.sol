@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {Gnosis} from "src/constants/Gnosis.sol";
 import {SavingsXDai} from "src/SavingsXDai.sol";
 import {ISavingsXDai} from "src/interfaces/ISavingsXDai.sol";
 import {BridgeInterestReceiver} from "src/BridgeInterestReceiver.sol";
@@ -11,6 +11,7 @@ import {IWXDAI} from "src/interfaces/IWXDAI.sol";
 import "src/periphery/SavingsXDaiAdapter.sol";
 
 contract SetupTest is Test {
+    bool internal constant VERBOSE_SETUP = false;
     address public initializer = makeAddr("initializer");
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
@@ -24,7 +25,7 @@ contract SetupTest is Test {
     function setUp() public payable {
         vm.createSelectFork("gnosis");
 
-        wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+        wxdai = IWXDAI(Gnosis.WXDAI);
         vm.deal(address(this), 100 ether);
         vm.deal(initializer, 100 ether);
         vm.deal(alice, 10000 ether);
@@ -38,13 +39,19 @@ contract SetupTest is Test {
         //////////////////////////////////////////////////////////////*/
 
         sDAI = new SavingsXDai("Savings DAI on Gnosis", "sDAI");
-        console.log("Deployed sDAI on Gnosis: %s", address(sDAI));
+        if (VERBOSE_SETUP) {
+            emit log_named_address("Deployed sDAI on Gnosis", address(sDAI));
+        }
 
         rcv = new BridgeInterestReceiver(address(sDAI));
-        console.log("Deployed InterestReceiver: %s", address(rcv));
+        if (VERBOSE_SETUP) {
+            emit log_named_address("Deployed InterestReceiver", address(rcv));
+        }
 
         adapter = new SavingsXDaiAdapter(address(rcv), payable(sDAI));
-        console.log("Deployed SavingsXDaiAdapter on Gnosis: %s", address(adapter));
+        if (VERBOSE_SETUP) {
+            emit log_named_address("Deployed SavingsXDaiAdapter on Gnosis", address(adapter));
+        }
         vm.stopPrank();
 
         deal(address(wxdai), initializer, 100e18);
@@ -63,22 +70,26 @@ contract SetupTest is Test {
                         INITIALIZER
     //////////////////////////////////////////////////////////////*/
 
-    function testInitialize() public {
+    function testInitialize_revertsWhenUnderfunded() public {
         vm.startPrank(initializer);
-        uint256 minBalance = rcv.MIN_INITIAL_BALANCE();
-        if (address(rcv).balance > minBalance) {
-            rcv.initialize(address(adapter));
-        } else {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    IBridgeInterestReceiver.InsufficientInitialBalance.selector,
-                    address(rcv).balance,
-                    minBalance
-                )
-            );
-            rcv.initialize(address(adapter));
-        }
+        uint256 minB = rcv.MIN_INITIAL_BALANCE();
+        vm.deal(address(rcv), minB);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IBridgeInterestReceiver.InsufficientInitialBalance.selector, minB, minB
+            )
+        );
+        rcv.initialize(address(adapter));
         vm.stopPrank();
+    }
+
+    function testInitialize_succeedsWhenFunded() public {
+        vm.startPrank(initializer);
+        uint256 minB = rcv.MIN_INITIAL_BALANCE();
+        vm.deal(address(rcv), minB + 1 wei);
+        rcv.initialize(address(adapter));
+        vm.stopPrank();
+        assertEq(rcv.claimer(), address(adapter));
     }
 
     function setClaimerAndInitialize() public {

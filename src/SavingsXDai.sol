@@ -1,17 +1,15 @@
-// SPDX-License-Identifier: agpl-3
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/extensions/ERC4626.sol";
+import {IERC1271} from "openzeppelin/interfaces/IERC1271.sol";
+import {Gnosis} from "./constants/Gnosis.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
 import {ISavingsXDai} from "./interfaces/ISavingsXDai.sol";
 import {IERC20Permit} from "openzeppelin/token/ERC20/extensions/IERC20Permit.sol";
 import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
 import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
 import {Nonces} from "openzeppelin/utils/Nonces.sol";
-
-interface IERC1271 {
-    function isValidSignature(bytes32, bytes memory) external view returns (bytes4);
-}
 
 /// @title SavingsXDai
 /// @notice See {ISavingsXDai}. WXDAI-backed ERC-4626 vault with EIP-2612 / ERC-1271 permit.
@@ -32,7 +30,7 @@ contract SavingsXDai is ERC4626, IERC20Permit, ISavingsXDai, EIP712, Nonces {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc ISavingsXDai
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public immutable wxdai = IWXDAI(Gnosis.WXDAI);
 
     /// @inheritdoc ISavingsXDai
     uint256 public immutable deploymentChainId;

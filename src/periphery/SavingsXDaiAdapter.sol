@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: agpl-3
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
+import {Gnosis} from "../constants/Gnosis.sol";
 import {IBridgeInterestReceiver} from "../interfaces/IBridgeInterestReceiver.sol";
 import {ISavingsXDaiAdapter} from "../interfaces/ISavingsXDaiAdapter.sol";
 import {IWXDAI} from "../interfaces/IWXDAI.sol";
@@ -23,7 +24,7 @@ contract SavingsXDaiAdapter is ISavingsXDaiAdapter {
     SavingsXDai private immutable _sDAI;
 
     /// @inheritdoc ISavingsXDaiAdapter
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public immutable wxdai = IWXDAI(Gnosis.WXDAI);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -68,16 +69,12 @@ contract SavingsXDaiAdapter is ISavingsXDaiAdapter {
 
     /// @inheritdoc ISavingsXDaiAdapter
     function withdraw(uint256 assets, address receiver) public pullInterestIfEoa returns (uint256) {
-        uint256 maxAssets = _sDAI.maxWithdraw(msg.sender);
-        assets = (assets > maxAssets) ? maxAssets : assets;
-        return _sDAI.withdraw(assets, receiver, msg.sender);
+        return _sDAI.withdraw(_cappedWithdrawAssets(assets), receiver, msg.sender);
     }
 
     /// @inheritdoc ISavingsXDaiAdapter
     function redeem(uint256 shares, address receiver) public pullInterestIfEoa returns (uint256) {
-        uint256 maxShares = _sDAI.maxRedeem(msg.sender);
-        shares = (shares > maxShares) ? maxShares : shares;
-        return _sDAI.redeem(shares, receiver, msg.sender);
+        return _sDAI.redeem(_cappedRedeemShares(shares), receiver, msg.sender);
     }
 
     /// @inheritdoc ISavingsXDaiAdapter
@@ -105,9 +102,7 @@ contract SavingsXDaiAdapter is ISavingsXDaiAdapter {
         if (assets == 0) {
             return 0;
         }
-        uint256 maxAssets = _sDAI.maxWithdraw(msg.sender);
-        assets = (assets > maxAssets) ? maxAssets : assets;
-        uint256 shares = _sDAI.withdraw(assets, address(this), msg.sender);
+        uint256 shares = _sDAI.withdraw(_cappedWithdrawAssets(assets), address(this), msg.sender);
         uint256 balance = wxdai.balanceOf(address(this));
         wxdai.withdraw(balance);
         _sendNative(receiver, balance);
@@ -150,6 +145,16 @@ contract SavingsXDaiAdapter is ISavingsXDaiAdapter {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+
+    function _cappedWithdrawAssets(uint256 assets) internal view returns (uint256) {
+        uint256 maxAssets = _sDAI.maxWithdraw(msg.sender);
+        return assets > maxAssets ? maxAssets : assets;
+    }
+
+    function _cappedRedeemShares(uint256 shares) internal view returns (uint256) {
+        uint256 maxShares = _sDAI.maxRedeem(msg.sender);
+        return shares > maxShares ? maxShares : shares;
+    }
 
     /// @dev Forwards `amount` of native xDAI to `to` via `call` and reverts with
     ///      {XDaiSendFailed} on failure.

@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: agpl-3
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "openzeppelin/proxy/utils/Initializable.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {Gnosis} from "./constants/Gnosis.sol";
 import {IWXDAI} from "./interfaces/IWXDAI.sol";
 import {IBridgeInterestReceiver} from "./interfaces/IBridgeInterestReceiver.sol";
 import {SavingsXDai} from "./SavingsXDai.sol";
@@ -31,7 +32,7 @@ contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBridgeInterestReceiver
-    IWXDAI public immutable wxdai = IWXDAI(0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d);
+    IWXDAI public immutable wxdai = IWXDAI(Gnosis.WXDAI);
 
     /// @inheritdoc IBridgeInterestReceiver
     address public immutable vault;
@@ -135,7 +136,10 @@ contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
     /// @inheritdoc IBridgeInterestReceiver
     function previewClaimable() external view returns (uint256) {
         return _computeClaimable(
-            block.timestamp, lastClaimTimestamp, currentEpochBalance, dripRate, EPOCH_LENGTH
+            _elapsedSinceLastClaim(block.timestamp, lastClaimTimestamp),
+            currentEpochBalance,
+            dripRate,
+            EPOCH_LENGTH
         );
     }
 
@@ -150,15 +154,21 @@ contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
 
+    function _elapsedSinceLastClaim(uint256 timestamp, uint256 _lastClaimTimestamp)
+        internal
+        pure
+        returns (uint256)
+    {
+        return timestamp - _lastClaimTimestamp;
+    }
+
     /// @dev Pure read: how much is claimable now given the current epoch state.
     function _computeClaimable(
-        uint256 timestamp,
-        uint256 _lastClaimTimestamp,
+        uint256 unclaimedTime,
         uint256 _currentEpochBalance,
         uint256 _dripRate,
         uint256 _epochLength
     ) internal pure returns (uint256 claimable) {
-        uint256 unclaimedTime = timestamp - _lastClaimTimestamp;
         if (unclaimedTime >= _epochLength) {
             claimable = _currentEpochBalance;
         } else {
@@ -190,11 +200,9 @@ contract BridgeInterestReceiver is IBridgeInterestReceiver, Initializable {
     ///      epoch, roll over / pause across boundaries). Caller is responsible for transferring
     ///      `claimable` and updating `lastClaimTimestamp`.
     function _settleClaim(uint256 balance) internal returns (uint256 claimable) {
-        claimable = _computeClaimable(
-            block.timestamp, lastClaimTimestamp, currentEpochBalance, dripRate, EPOCH_LENGTH
-        );
+        uint256 unclaimedTime = _elapsedSinceLastClaim(block.timestamp, lastClaimTimestamp);
+        claimable = _computeClaimable(unclaimedTime, currentEpochBalance, dripRate, EPOCH_LENGTH);
 
-        uint256 unclaimedTime = block.timestamp - lastClaimTimestamp;
         if (unclaimedTime < EPOCH_LENGTH) {
             // Safe: _computeClaimable caps `claimable` at `currentEpochBalance`.
             currentEpochBalance -= claimable;
