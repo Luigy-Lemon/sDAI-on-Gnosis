@@ -1,17 +1,14 @@
-# Compiler files
+# Compiler / Foundry
 cache/
 out/
+coverage/
+lib/
+broadcast/
 
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
-
-# Ignore foundry folders
-lib/
-broadcast/
-cache/
-out/
 
 # Docs
 docs/

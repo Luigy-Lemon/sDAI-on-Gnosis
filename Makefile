@@ -3,6 +3,8 @@
 # (-include to ignore error if it does not exist)
 -include .env
 
+.PHONY: install update build tests fork deploy-chiado deploy-gnosis coverage
+
 install	:; curl -L https://foundry.paradigm.xyz | bash && foundryup -v nightly-e05b9c75b4501d5880764948b61db787f3dd7fe0
 
 # deps
@@ -18,3 +20,5 @@ fork	:; ./forkSetup.sh
 deploy-chiado :; forge script script/SavingsXDaiDeployer.s.sol:SavingsXDaiDeployer --rpc-url chiado --broadcast -vvvv
 
 deploy-gnosis :; forge script script/SavingsXDaiDeployer.s.sol:SavingsXDaiDeployer --rpc-url gnosis --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY_GNOSIS} -vvvv
+
+coverage :; forge coverage --report lcov --report-file coverage/lcov.info
